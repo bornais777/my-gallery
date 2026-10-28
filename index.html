@@ -1,0 +1,2039 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f3f0ea">
+<title>画谱</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --bg:#f3f0ea;--ink:#1d1a24;--ink2:#58535f;--ink3:#9a95a2;
+  --glass:rgba(255,255,255,.56);--glass2:rgba(255,255,255,.8);--field:rgba(255,255,255,.62);
+  --stroke:rgba(255,255,255,.78);--line:rgba(30,24,44,.09);
+  --accent:#6a5bff;--accent-soft:rgba(106,91,255,.12);--pink:#ff7aa8;
+  --yellow:#ffe27d;--yellow-ink:#5a4300;--yellow-soft:rgba(255,214,90,.28);--danger:#e0464d;
+  --r:26px;--r2:18px;--r3:12px;
+  --sh:0 22px 48px -22px rgba(46,30,96,.32),0 2px 8px -3px rgba(46,30,96,.08);
+  --blur:blur(22px) saturate(1.6);--orb:.62;--tw:210px;color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){
+  --bg:#0e0d14;--ink:#efecf7;--ink2:#b4afc1;--ink3:#77728a;
+  --glass:rgba(30,27,45,.56);--glass2:rgba(38,35,56,.86);--field:rgba(10,8,18,.4);
+  --stroke:rgba(255,255,255,.09);--line:rgba(255,255,255,.08);
+  --accent:#a094ff;--accent-soft:rgba(160,148,255,.16);
+  --yellow:#e9c548;--yellow-ink:#2a1f00;--yellow-soft:rgba(233,197,72,.2);
+  --sh:0 22px 48px -22px rgba(0,0,0,.7),0 2px 8px -3px rgba(0,0,0,.4);--orb:.2;color-scheme:dark}}
+:root[data-theme=dark]{
+  --bg:#0e0d14;--ink:#efecf7;--ink2:#b4afc1;--ink3:#77728a;
+  --glass:rgba(30,27,45,.56);--glass2:rgba(38,35,56,.86);--field:rgba(10,8,18,.4);
+  --stroke:rgba(255,255,255,.09);--line:rgba(255,255,255,.08);
+  --accent:#a094ff;--accent-soft:rgba(160,148,255,.16);
+  --yellow:#e9c548;--yellow-ink:#2a1f00;--yellow-soft:rgba(233,197,72,.2);
+  --sh:0 22px 48px -22px rgba(0,0,0,.7),0 2px 8px -3px rgba(0,0,0,.4);--orb:.2;color-scheme:dark}
+html,body{margin:0}
+body{font-family:"Inter","PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--ink);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;min-height:100vh;overflow-x:hidden}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;padding:0}
+button:disabled{opacity:.4;cursor:default}
+input,textarea,select{font:inherit;color:var(--ink)}
+img{display:block}
+h1,h2,h3,p{margin:0}
+.ic{flex:none}
+.muted{color:var(--ink3)} .sm{font-size:12px}
+.orbs{position:fixed;inset:0;z-index:-1;overflow:hidden;pointer-events:none}
+.orbs i{position:absolute;border-radius:50%;filter:blur(90px);opacity:var(--orb)}
+.orbs i:nth-child(1){width:55vw;height:55vw;left:-14vw;top:-20vw;background:#c6b4ff}
+.orbs i:nth-child(2){width:42vw;height:42vw;right:-12vw;top:10vh;background:#ffbfd2}
+.orbs i:nth-child(3){width:48vw;height:48vw;left:26vw;bottom:-24vw;background:#b2e2ff}
+.glass{background:var(--glass);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:1px solid var(--stroke);box-shadow:var(--sh)}
+
+/* 顶栏 */
+.top{position:sticky;top:12px;z-index:50;max-width:1440px;margin:12px auto 0;width:calc(100% - 24px);display:flex;align-items:center;gap:10px;padding:8px 10px 8px 18px;border-radius:999px}
+.brand{display:flex;align-items:center;gap:9px;font-weight:700;font-size:16px;letter-spacing:.02em;margin-right:6px}
+.logo{width:24px;height:24px;border-radius:8px;background:conic-gradient(from 200deg,#8b7bff,#ff8db3,#ffd27a,#8be0ff,#8b7bff);box-shadow:inset 0 0 0 2px rgba(255,255,255,.5)}
+.tabs{display:flex;gap:2px;flex:1;overflow-x:auto;scrollbar-width:none}
+.tabs button{display:flex;align-items:center;gap:6px;padding:8px 13px;border-radius:999px;color:var(--ink2);white-space:nowrap;transition:background .2s,color .2s}
+.tabs button:hover{background:var(--accent-soft);color:var(--ink)}
+.tabs button.on{background:var(--ink);color:var(--bg)}
+.adds{display:flex;gap:6px}
+.sync-badge{display:flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;font-size:12px;color:var(--ink2);background:var(--field);border:1px solid var(--line)}
+.sync-badge.dirty{color:#b07800} .sync-badge.busy .ic{animation:spin 1.2s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* 按钮 */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 15px;border-radius:999px;border:1px solid var(--line);background:var(--glass2);color:var(--ink);font-size:13.5px;white-space:nowrap;transition:transform .15s,background .2s,box-shadow .2s}
+.btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 16px -8px rgba(40,30,90,.35)}
+.btn.pri{background:var(--ink);color:var(--bg);border-color:transparent}
+.btn.ghost{background:transparent;border-color:transparent}
+.btn.ghost:hover{background:var(--accent-soft)}
+.btn.sm{height:30px;padding:0 12px;font-size:12.5px}
+.btn.xs{height:26px;padding:0 10px;font-size:12px;gap:4px}
+.btn.danger{color:var(--danger)}
+.btn.icon-btn{width:36px;padding:0}
+.btn.xs.icon-btn{width:26px}
+.btn.tgl.on{background:var(--accent);color:#fff;border-color:transparent}
+.btn.loading{pointer-events:none;opacity:.7}
+.btn.loading .ic{animation:spin 1s linear infinite}
+
+main{max-width:1440px;margin:0 auto;padding:18px 18px 140px}
+
+/* 首页 */
+.hero{text-align:center;padding:26px 0 0}
+.hero h1{font-size:46px;font-weight:800;letter-spacing:.06em;background:linear-gradient(120deg,var(--ink) 30%,var(--accent) 70%,var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p{color:var(--ink2);margin-top:6px}
+.search{display:flex;align-items:center;gap:8px;padding:0 14px;height:38px;border-radius:999px;background:var(--field);border:1px solid var(--line);color:var(--ink3);min-width:200px}
+.search input{border:0;background:none;outline:none;flex:1;min-width:0;height:100%}
+.hero-search{max-width:360px;margin:18px auto 0;height:44px}
+.fan{position:relative;height:calc(var(--fw) * 1.5 + 130px);margin-top:4px;touch-action:pan-y;user-select:none;-webkit-user-select:none;cursor:grab;overflow:hidden}
+.fan:active{cursor:grabbing}
+.fcard{position:absolute;left:50%;top:calc(50% + 10px);width:var(--fw);aspect-ratio:2/3;margin-left:calc(var(--fw) / -2);margin-top:calc(var(--fw) * -.75);border-radius:24px;overflow:hidden;background:var(--glass2);border:1px solid var(--stroke);box-shadow:0 28px 50px -26px rgba(30,20,70,.55);transform-origin:50% 175%;will-change:transform}
+.fcard img{width:100%;height:100%;object-fit:cover;pointer-events:none;opacity:0;transition:opacity .4s}
+.fcard img.ld{opacity:1}
+.fcard.center{box-shadow:0 40px 80px -30px rgba(90,70,220,.65),0 0 0 2px rgba(255,255,255,.55)}
+.fcard .lab{position:absolute;left:10px;right:10px;bottom:10px;display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:15px;background:rgba(255,255,255,.62);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:#1d1a24;font-size:12.5px}
+.fcard .lab b{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fcard .lab span{font-size:11px;padding:1px 7px;border-radius:999px;background:rgba(0,0,0,.08)}
+.noimg-f{height:100%;display:grid;place-items:center;padding:24px;text-align:center;background:linear-gradient(160deg,#c9bbff,#ffc4d7 60%,#ffe2a8);color:#fff;font-weight:800;font-size:20px;text-shadow:0 2px 12px rgba(80,40,120,.35);word-break:break-word}
+.fan-ctrl{display:flex;align-items:center;justify-content:center;gap:16px;margin-top:-8px;color:var(--ink2);font-variant-numeric:tabular-nums}
+.fan-ctrl .btn:first-child .ic{transform:rotate(180deg)}
+.az{display:flex;flex-wrap:wrap;justify-content:center;gap:2px;max-width:720px;margin:18px auto 0;padding:6px;border-radius:999px}
+.az button{width:26px;height:26px;border-radius:50%;font-size:12px;font-weight:600;color:var(--ink2)}
+.az button:hover:not(:disabled){background:var(--accent);color:#fff}
+.hint{text-align:center;color:var(--ink3);font-size:12px;margin-top:14px}
+.welcome{max-width:760px;margin:30px auto;padding:22px;border-radius:var(--r)}
+.welcome>p{font-weight:600;margin-bottom:12px}
+.wel-btns{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.wbtn{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:16px;border-radius:var(--r2);background:var(--glass2);border:1px solid var(--line);text-align:left;transition:transform .2s}
+.wbtn:hover{transform:translateY(-3px)}
+.wbtn .ic{color:var(--accent)} .wbtn span{font-size:12px;color:var(--ink3)}
+
+/* 弹出牌 */
+.modal.pop{display:grid;grid-template-columns:minmax(220px,340px) 1fr;gap:24px;align-items:start;width:min(860px,100%)}
+.pop-card{border-radius:24px;overflow:hidden;aspect-ratio:2/3;background:var(--glass2);box-shadow:0 30px 60px -26px rgba(60,40,150,.55);animation:cardpop .45s cubic-bezier(.2,.9,.3,1.25) both}
+.pop-card img{width:100%;height:100%;object-fit:cover}
+@keyframes cardpop{from{transform:translateY(60px) rotate(-6deg) scale(.82);opacity:0}}
+.pop-info{display:flex;flex-direction:column;gap:12px;min-width:0}
+.pop-strip{display:flex;flex-wrap:wrap;gap:8px}
+.ps{width:64px;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:var(--field);border:1px solid var(--line);display:grid;place-items:center;transition:transform .2s}
+.ps:hover{transform:translateY(-3px) rotate(-2deg)}
+.ps img{width:100%;height:100%;object-fit:cover}
+
+/* 画师串 */
+.lib-head{display:flex;flex-direction:column;gap:12px;margin-bottom:6px}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px;border-radius:var(--r)}
+.toolbar .search{flex:1}
+select,.inp,.field input,.field textarea{height:36px;padding:0 12px;border-radius:12px;border:1px solid var(--line);background:var(--field);outline:none;transition:border-color .2s,box-shadow .2s}
+.toolbar select{border-radius:999px}
+select:focus,.inp:focus,.field input:focus,.field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.slider{display:flex;align-items:center;gap:6px;color:var(--ink3);padding:0 6px}
+.slider input{width:100px;accent-color:var(--accent)}
+.notice{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:var(--r2);font-size:13px}
+.notice span{flex:1}
+.filter-note{display:flex;align-items:center;gap:8px;font-size:13px}
+.folders{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:thin}
+.fchip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 13px;border-radius:999px;background:var(--glass);border:1px solid var(--stroke);white-space:nowrap;font-size:13px;cursor:pointer;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.fchip i{font-style:normal;font-size:11px;color:var(--ink3)}
+.fchip.on{background:var(--ink);color:var(--bg)} .fchip.on i{color:inherit;opacity:.6}
+.fchip.add{color:var(--accent);border-style:dashed;border-color:var(--accent)}
+.fmenu{margin-right:-6px;width:20px;height:20px;border-radius:50%;line-height:1}
+.fmenu:hover{background:rgba(127,127,127,.2)}
+.rows-meta{font-size:12px;margin:6px 4px}
+.row{margin:14px 0;padding:14px 14px 6px;border-radius:var(--r);transition:box-shadow .4s}
+.row.flash{box-shadow:0 0 0 3px var(--accent),var(--sh)}
+.row-h{display:flex;align-items:center;gap:10px;margin:0 2px 10px}
+.row-names{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;flex:1;min-width:0;font-weight:650}
+.row-names.big{font-size:18px}
+.rn{white-space:nowrap}
+.dot{width:4px;height:4px;border-radius:50%;background:var(--ink3);display:inline-block}
+.count{font-size:12px;color:var(--ink3);white-space:nowrap}
+.rowtgl .ic{transition:transform .3s}
+.row.open .rowtgl .ic{transform:rotate(180deg)}
+.track{display:flex;align-items:flex-start;gap:14px;overflow-x:auto;padding:4px 4px 12px;scrollbar-width:thin;scroll-behavior:auto}
+.track.dragging{cursor:grabbing;user-select:none}
+.track.dragging *{pointer-events:none}
+.rest{display:flex;align-items:flex-start;gap:14px}
+.row.anim .rest .card{animation:slidein .5s cubic-bezier(.2,.85,.25,1) both;animation-delay:calc(var(--i) * 45ms)}
+@keyframes slidein{from{opacity:0;transform:translateX(-60px) scale(.94) rotate(-2deg)}}
+.card{flex:0 0 var(--tw);width:var(--tw);border-radius:var(--r2);background:var(--glass2);border:1px solid var(--line);position:relative;transition:width .3s,flex-basis .3s,box-shadow .2s}
+.card.open{flex-basis:max(var(--tw),330px);width:max(var(--tw),330px)}
+.card.sel{box-shadow:0 0 0 3px var(--accent)}
+.card.stacked{margin-right:16px;box-shadow:7px 6px 0 -1px var(--glass2),7px 6px 0 0 var(--line),14px 12px 0 -2px var(--glass2),14px 12px 0 -1px var(--line)}
+.img{position:relative;aspect-ratio:var(--ar,2/3);max-height:calc(var(--tw) * 1.8);border-radius:var(--r2) var(--r2) 10px 10px;overflow:hidden;background:linear-gradient(135deg,rgba(127,118,150,.14),rgba(127,118,150,.05));cursor:pointer}
+.img>img{width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .4s,transform .5s}
+.img>img.ld{opacity:1}
+.img:hover>img{transform:scale(1.025)}
+.noimg{position:absolute;inset:8px;border:1.5px dashed var(--ink3);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;opacity:.85}
+.noimg-b{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+.ov-top{position:absolute;top:8px;left:8px;right:8px;display:flex;gap:5px;align-items:center}
+.ov-top .sp{flex:1}
+.tag-base,.tag-y{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px}
+.tag-base{background:rgba(255,255,255,.75);color:#1d1a24;backdrop-filter:blur(8px)}
+.tag-y{background:var(--yellow);color:var(--yellow-ink)}
+.star{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.55);backdrop-filter:blur(10px);color:#5a5566;opacity:0;transition:opacity .2s,transform .2s}
+.card:hover .star,.star.on{opacity:1}
+.star.on{color:#f5a623} .star.on svg{fill:currentColor}
+.star:hover{transform:scale(1.1)}
+@media (hover:none){.star{opacity:1}}
+.stack-n{position:absolute;right:10px;bottom:10px;display:flex;flex-direction:column;align-items:flex-end;padding:6px 11px;border-radius:14px;background:rgba(20,16,34,.5);backdrop-filter:blur(12px);color:#fff;line-height:1.2}
+.stack-n b{font-size:18px} .stack-n small{font-size:10.5px;opacity:.85}
+.lb-btn{position:absolute;left:8px;bottom:8px;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.6);backdrop-filter:blur(10px);color:#2a2633;opacity:0;transition:opacity .2s}
+.card:hover .lb-btn{opacity:1}
+@media (hover:none){.lb-btn{opacity:.9}}
+.selbox{position:absolute;right:8px;bottom:8px;width:24px;height:24px;border-radius:8px;background:rgba(255,255,255,.85);border:2px solid var(--accent);display:grid;place-items:center;color:var(--accent)}
+.body{padding:10px 11px 11px;display:flex;flex-direction:column;gap:7px}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:8px;font-size:12px;line-height:1.35;background:rgba(127,118,150,.12);color:var(--ink);cursor:pointer;border:1px solid transparent;max-width:100%;word-break:break-word;text-align:left}
+.chip.artist{font-weight:650}
+.chip.style{font-style:italic}
+.chip i{font-style:normal;font-weight:500;font-size:10.5px;opacity:.65}
+.chip.mono{filter:grayscale(1)}
+.chip.hl{background:var(--yellow);color:var(--yellow-ink)}
+.chip.hl i{opacity:.8}
+.chip.general{color:var(--ink3);font-weight:400}
+.chip.big{font-size:13px;padding:5px 11px}
+.chip.cat::before{content:"";width:6px;height:6px;border-radius:50%;flex:none;background:var(--ink3)}
+.chip.cat-artist::before{background:var(--accent)} .chip.cat-style::before{background:var(--pink)}
+.chip.cat-scene{opacity:.62} .chip.cat-pending{border:1px dashed var(--ink3)} .chip.cat-pending::before{background:transparent;border:1px solid var(--ink3)}
+.chip .wt{width:46px;height:20px;padding:0 4px;border-radius:6px;border:1px solid var(--line);background:var(--field);font-size:11px}
+.chip button{display:grid;place-items:center;opacity:.6}
+.removed{display:flex;flex-wrap:wrap;gap:4px 8px}
+.removed s{color:var(--ink3);font-size:12px}
+.vtags{display:flex;flex-wrap:wrap;gap:4px;padding:3px;border-radius:9px}
+.vtags.hl{background:var(--yellow-soft)}
+.vtag{display:inline-flex;align-items:center;gap:5px;padding:2px 8px 2px 2px;border-radius:8px;font-size:11.5px;cursor:pointer;max-width:100%}
+.vtag b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:110px}
+.vtag i{font-style:normal;opacity:.7}
+.vtag.solid{background:var(--accent-soft);color:var(--accent)}
+.vtag.solid img{width:22px;height:22px;border-radius:6px;object-fit:cover}
+.vtag.hollow{padding:3px 8px;border:1.5px solid var(--ink3);color:var(--ink2)}
+.sq{width:10px;height:10px;border:1.6px solid currentColor;border-radius:2px;display:inline-block}
+.sq.f{background:currentColor;margin-left:5px}
+.card-foot{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:12px}
+.card-foot .muted{display:flex;align-items:center;gap:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.xp{display:flex;flex-direction:column;gap:11px;border-top:1px solid var(--line);padding-top:11px;animation:fadein .3s}
+@keyframes fadein{from{opacity:0;transform:translateY(-4px)}}
+.xp-l{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;font-weight:650;color:var(--ink2);margin-bottom:4px;text-transform:uppercase;letter-spacing:.04em}
+.ptxt{font-size:12.5px;line-height:1.6;word-break:break-word;white-space:pre-wrap;background:var(--field);padding:8px 10px;border-radius:10px;max-height:220px;overflow:auto;user-select:text}
+.ptxt.neg{color:var(--ink2)}
+.meta-grid{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:12px}
+.meta-grid span{color:var(--ink3)} .meta-grid b{font-weight:550;word-break:break-all}
+.note{font-size:12.5px;padding:8px 10px;border-radius:10px;background:var(--accent-soft);white-space:pre-wrap}
+.xp-act{display:flex;flex-wrap:wrap;gap:5px}
+.recipe{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--tw),1fr));gap:14px;align-items:start}
+.recipe .card{width:auto}
+.empty{padding:40px 20px;text-align:center;border-radius:var(--r);color:var(--ink2);display:flex;flex-direction:column;gap:6px;align-items:center;grid-column:1/-1}
+.empty p{font-size:13px;color:var(--ink3)}
+
+/* 页面通用 */
+.page-h{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin:10px 4px 16px;flex-wrap:wrap}
+.page-h h2{font-size:26px;font-weight:750}
+.page-h h3{font-size:17px}
+.page-h p{margin-top:4px;font-size:13px}
+.page-h.sub{margin-top:30px}
+
+/* vibe */
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px}
+.vcard{border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;transition:box-shadow .4s}
+.vcard.flash{box-shadow:0 0 0 3px var(--accent),var(--sh)}
+.vprev{position:relative;aspect-ratio:1;background:var(--field);display:grid;place-items:center}
+.vprev img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .4s}
+.vprev img.ld{opacity:1}
+.vrep{position:absolute;right:10px;bottom:10px;opacity:0;transition:opacity .2s}
+.vcard:hover .vrep{opacity:1}
+.venc{position:absolute;left:10px;top:10px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;background:rgba(255,255,255,.75);color:#2a2633}
+.vbody{padding:12px 14px 14px;display:flex;flex-direction:column;gap:9px}
+.vname{font-size:16px;font-weight:700;border:0;background:none;outline:none;padding:2px 0;border-bottom:1px dashed transparent}
+.vname:focus{border-bottom-color:var(--accent)}
+.vbody textarea{border:1px solid var(--line);background:var(--field);border-radius:10px;padding:7px 10px;resize:vertical;outline:none;font-size:13px}
+.vmodels{display:flex;flex-wrap:wrap;gap:5px}
+.mchip{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--field)}
+.mchip.on{background:var(--accent);color:#fff;border-color:transparent}
+.vuse{font-size:12.5px;color:var(--ink2)} .vuse b{font-size:16px;color:var(--ink)}
+.vthumbs{display:flex;flex-wrap:wrap;gap:5px}
+.vthumbs button{width:42px;height:56px;border-radius:8px;overflow:hidden;background:var(--field);display:grid;place-items:center}
+.vthumbs img{width:100%;height:100%;object-fit:cover}
+.vact{display:flex;justify-content:flex-end}
+.hollow{padding:14px;border-radius:var(--r)}
+.hgrid{display:flex;flex-wrap:wrap;gap:8px}
+.hitem{position:relative;width:78px;aspect-ratio:2/3;border-radius:12px;overflow:hidden;background:var(--field);display:grid;place-items:center;border:2px solid transparent}
+.hitem.on{border-color:var(--accent)}
+.hitem img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.hitem i{position:absolute;left:4px;right:4px;bottom:4px;font-style:normal;font-size:10.5px;padding:1px 4px;border-radius:6px;background:rgba(255,255,255,.8);color:#222}
+.hbar{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.vpick{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin:14px 0}
+.vpick button{display:flex;flex-direction:column;gap:6px;align-items:center;padding:8px;border-radius:14px;background:var(--field);border:1px solid var(--line);transition:transform .2s}
+.vpick button:hover{transform:translateY(-2px);border-color:var(--accent)}
+.vpick img,.vpick span{width:100%;aspect-ratio:1;object-fit:cover;border-radius:10px;display:grid;place-items:center}
+.vpick b{font-size:12px;font-weight:600}
+
+/* 索引、查重 */
+.aidx{padding:14px 16px;border-radius:var(--r2);margin-bottom:12px}
+.aidx h3{font-size:15px;margin-bottom:8px;color:var(--accent)}
+.dup-list{display:flex;flex-direction:column;gap:10px}
+.dupitem{display:flex;align-items:center;gap:14px;padding:10px 14px;border-radius:var(--r2)}
+.dthumbs{display:flex;gap:6px}
+.dthumbs img,.dthumbs span{width:46px;height:64px;border-radius:9px;object-fit:cover;background:var(--field);display:grid;place-items:center}
+.dinfo{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
+.dinfo b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dinfo .tag-y{align-self:flex-start}
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0}
+.dside{display:flex;flex-direction:column;gap:9px;min-width:0}
+.dlabel{font-size:12px;font-weight:650;color:var(--ink2)}
+.dimg{aspect-ratio:2/3;max-height:340px;border-radius:14px;overflow:hidden;background:var(--field);display:grid;place-items:center}
+.dimg img{width:100%;height:100%;object-fit:contain}
+.ptable{width:100%;border-collapse:collapse;font-size:12px}
+.ptable td{padding:4px 6px;border-bottom:1px solid var(--line);word-break:break-all}
+.ptable td:first-child{color:var(--ink3);width:62px}
+.ptable tr.hl td{background:var(--yellow-soft)}
+
+/* 设置 */
+.sgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:16px;align-items:start}
+.scard{padding:18px;border-radius:var(--r);display:flex;flex-direction:column;gap:2px}
+.scard h3{display:flex;align-items:center;gap:8px;font-size:15px;margin-bottom:12px;flex-wrap:wrap}
+.scard h3 .muted{font-size:12px;font-weight:400}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:11px;min-width:0}
+.field>span{font-size:12px;color:var(--ink2)}
+.field em{font-style:normal}
+.field textarea{height:auto;padding:9px 12px;resize:vertical;line-height:1.55}
+.mono-ta{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.f3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.f4{display:grid;grid-template-columns:1.3fr 1fr .8fr .8fr;gap:10px}
+.srow{display:flex;align-items:center;gap:10px;margin-top:4px}
+.srow.wrap{flex-wrap:wrap;margin-bottom:10px}
+.check{display:flex;align-items:center;gap:8px;font-size:13px;margin:4px 0 6px}
+.check input{accent-color:var(--accent);width:16px;height:16px}
+.row-inline{display:flex;gap:8px;align-items:center;margin-top:6px}
+.row-inline .inp{flex:1}
+
+/* 弹窗 */
+#modals .mask{position:fixed;inset:0;z-index:100;display:grid;place-items:center;padding:16px;background:rgba(18,12,34,.32);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);animation:fade .2s}
+#modals .mask.out{animation:fade .18s reverse forwards}
+@keyframes fade{from{opacity:0}}
+.modal{width:min(520px,100%);max-height:calc(100vh - 32px);overflow:auto;border-radius:28px;padding:22px;background:var(--glass2);backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);border:1px solid var(--stroke);box-shadow:0 40px 90px -30px rgba(20,10,60,.55);animation:rise .32s cubic-bezier(.2,.9,.3,1.15)}
+.modal.wide{width:min(980px,100%)}
+@keyframes rise{from{opacity:0;transform:translateY(24px) scale(.97)}}
+.modal h3{font-size:18px;margin-bottom:6px}
+.modal>.muted{font-size:13px}
+.ask-body{color:var(--ink2);font-size:13.5px;margin:6px 0 4px}
+.modal .inp{width:100%;margin-top:10px}
+.m-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;flex-wrap:wrap}
+.ed-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.ed-grid{display:grid;grid-template-columns:1fr 280px;gap:20px}
+.ed-side{display:flex;flex-direction:column;gap:10px}
+.ed-img{aspect-ratio:2/3;border-radius:18px;overflow:hidden;background:var(--field);border:1px dashed var(--line);display:grid;place-items:center;text-align:center;font-size:12px}
+.ed-img img{width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .3s}
+.ed-img img.ld{opacity:1}
+.gen-box{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:16px;background:var(--accent-soft)}
+.seg{display:grid;grid-template-columns:1fr 1fr;padding:3px;border-radius:999px;background:var(--field)}
+.seg button{height:30px;border-radius:999px;font-weight:600;font-size:13px;color:var(--ink2)}
+.seg button.on{background:var(--ink);color:var(--bg)}
+.vslots{display:flex;flex-direction:column;gap:6px}
+.vslot{display:grid;grid-template-columns:1fr 80px 90px 26px;gap:6px;align-items:center}
+.vslot input{height:32px;padding:0 8px;border-radius:10px;border:1px solid var(--line);background:var(--field);outline:none}
+.vslot select{height:32px}
+.popmenu{position:fixed;z-index:200;min-width:150px;padding:6px;border-radius:16px;display:flex;flex-direction:column;animation:rise .18s}
+.popmenu button{text-align:left;padding:8px 12px;border-radius:10px;font-size:13px}
+.popmenu button:hover{background:var(--accent-soft)}
+.popmenu button.on{color:var(--accent);font-weight:650}
+.popmenu button.on::after{content:" ✓"}
+.popmenu button.danger{color:var(--danger)}
+.popmenu hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+.pm-label{font-size:11.5px;color:var(--ink3);padding:4px 12px 6px;max-width:260px;word-break:break-word}
+
+/* toast、底栏 */
+#toasts{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:300;display:flex;flex-direction:column;align-items:center;gap:8px;pointer-events:none;width:max-content;max-width:calc(100vw - 32px)}
+.toast{padding:10px 18px;border-radius:999px;font-size:13px;animation:rise .25s;pointer-events:auto;text-align:center}
+.toast.out{opacity:0;transform:translateY(8px);transition:.3s}
+.bulk{position:fixed;left:50%;bottom:24px;transform:translate(-50%,140%);z-index:60;display:flex;align-items:center;gap:8px;padding:8px 10px 8px 18px;border-radius:999px;transition:transform .35s cubic-bezier(.2,.9,.3,1.2);flex-wrap:wrap;justify-content:center;max-width:calc(100vw - 24px)}
+.bulk.show{transform:translate(-50%,0)}
+.bnav,.fab,.fab-menu{display:none}
+body.dropping::after{content:"松手导入";position:fixed;inset:12px;z-index:400;border:3px dashed var(--accent);border-radius:30px;display:grid;place-items:center;font-size:22px;font-weight:700;color:var(--accent);background:rgba(106,91,255,.08);backdrop-filter:blur(6px)}
+
+/* 灯箱 */
+.lb{position:fixed;inset:0;z-index:150;background:rgba(8,6,16,.9);backdrop-filter:blur(8px);animation:fade .2s}
+.lb-stage{position:absolute;inset:0;display:grid;place-items:center;overflow:hidden;touch-action:none}
+.lbimg{max-width:94vw;max-height:90vh;border-radius:14px;transition:transform .12s;user-select:none}
+.lb-x,.lb-p,.lb-n{position:absolute;width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.12);color:#fff;backdrop-filter:blur(10px)}
+.lb-x{top:16px;right:16px}
+.lb-p{left:16px;top:50%;transform:translateY(-50%) rotate(180deg)} .lb-n{right:16px;top:50%;transform:translateY(-50%)}
+.lb-c{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);padding:6px 14px;border-radius:999px;font-size:12px;color:#fff;background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.15);max-width:90vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* 手机 */
+@media (max-width:820px){
+  .top{border-radius:22px;padding:8px 10px 8px 14px}
+  .tabs,.adds{display:none}
+  .brand{flex:1}
+  .bnav{display:grid;grid-template-columns:repeat(6,1fr);position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom));z-index:55;border-radius:24px;padding:6px}
+  .bnav button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border-radius:16px;font-size:10.5px;color:var(--ink2)}
+  .bnav button.on{background:var(--ink);color:var(--bg)}
+  .fab{display:grid;place-items:center;position:fixed;right:18px;bottom:calc(88px + env(safe-area-inset-bottom));z-index:56;width:54px;height:54px;border-radius:50%;background:var(--ink);color:var(--bg);box-shadow:0 14px 30px -10px rgba(40,20,90,.55)}
+  .fab-menu{display:flex;flex-direction:column;gap:4px;position:fixed;right:18px;bottom:calc(150px + env(safe-area-inset-bottom));z-index:56;padding:8px;border-radius:20px;transform:scale(.8) translateY(20px);transform-origin:bottom right;opacity:0;pointer-events:none;transition:.25s cubic-bezier(.2,.9,.3,1.2)}
+  .fab-menu.show{transform:none;opacity:1;pointer-events:auto}
+  .fab-menu button{display:flex;align-items:center;gap:10px;padding:11px 16px;border-radius:14px;font-size:14px;text-align:left}
+  .fab-menu button:active{background:var(--accent-soft)}
+  main{padding:14px 10px 170px}
+  .hero h1{font-size:36px}
+  .toolbar .search{flex-basis:100%}
+  .slider input{width:80px}
+  .row{padding:12px 10px 4px;margin:10px 0}
+  .modal{padding:18px;border-radius:24px}
+  .modal.pop{grid-template-columns:1fr}
+  .pop-card{max-width:260px;margin:0 auto;width:100%}
+  .ed-grid{grid-template-columns:1fr}
+  .ed-img{max-height:260px;aspect-ratio:auto;height:220px}
+  .f4{grid-template-columns:1fr 1fr}
+  .dgrid{gap:10px}
+  .sgrid{grid-template-columns:1fr}
+  .bulk{bottom:calc(90px + env(safe-area-inset-bottom))}
+  #toasts{bottom:calc(96px + env(safe-area-inset-bottom))}
+  .card.open{flex-basis:min(330px,82vw);width:min(330px,82vw)}
+}
+
+/* 修正 */
+.fan{isolation:isolate}
+.sync-badge[hidden]{display:none}
+.scard,.sgrid>*{min-width:0}
+.field input,.field select,.field textarea{width:100%;max-width:100%}
+select{max-width:100%;text-overflow:ellipsis}
+@media (max-width:820px){
+  .az{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;border-radius:18px;scrollbar-width:none;max-width:100%}
+  .az button{flex:none}
+  .f3{grid-template-columns:1fr 1fr 1fr}
+}
+
+</style>
+</head>
+<body>
+<div class="orbs"><i></i><i></i><i></i></div>
+<header class="top glass">
+  <div class="brand"><span class="logo"></span><span>画谱</span></div>
+  <nav class="tabs" id="tabs"></nav>
+  <div class="adds">
+    <button class="btn sm" data-act="newfolder" title="新建文件夹"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>文件夹</button>
+    <button class="btn sm" data-act="add-img"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg>图片</button>
+    <button class="btn sm" data-act="add-text"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg>文字串</button>
+    <button class="btn sm" data-act="add-vibe"><svg class="ic" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4z"/></svg>vibe</button>
+  </div>
+  <button class="sync-badge" id="syncBadge" data-act="sync" hidden></button>
+</header>
+<main id="main"></main>
+<nav class="bnav glass" id="bnav"></nav>
+<button class="fab" data-act="fab" aria-label="添加"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></button>
+<div class="fab-menu glass" id="fabMenu">
+  <button data-act="add-img">添加图片</button>
+  <button data-act="add-text">添加文字串</button>
+  <button data-act="add-vibe">上传 vibe</button>
+  <button data-act="newfolder">新建文件夹</button>
+</div>
+<div class="bulk glass" id="bulk"></div>
+<div id="toasts"></div>
+<div id="modals"></div>
+<script>
+'use strict';
+/* ================= 工具 ================= */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const now = () => Date.now();
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const td = new TextDecoder();
+function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(36); }
+async function sha256(buf) { const d = await crypto.subtle.digest('SHA-256', buf); return [...new Uint8Array(d)].map(b => b.toString(16).padStart(2, '0')).join(''); }
+function u8ToB64(u8) { let s = ''; const CH = 0x8000; for (let i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH)); return btoa(s); }
+function b64ToU8(b64) { const bin = atob(String(b64).replace(/\s/g, '')); const u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return u; }
+const b64ToBlob = (b64, mime = 'application/octet-stream') => new Blob([b64ToU8(b64)], { type: mime });
+async function blobToB64(b) { return u8ToB64(new Uint8Array(await b.arrayBuffer())); }
+const utf8B64 = s => u8ToB64(new TextEncoder().encode(s));
+function dataURLtoBlob(u) { const [h, b] = String(u).split(','); const mime = (h.match(/data:([^;]+)/) || [])[1] || 'image/png'; return b64ToBlob(b, mime); }
+async function inflate(u8, fmt) { const s = new Blob([u8]).stream().pipeThrough(new DecompressionStream(fmt)); return new Uint8Array(await new Response(s).arrayBuffer()); }
+function parseJSONLoose(t) {
+  if (!t) throw new Error('AI 返回为空');
+  t = String(t).replace(/```(?:json)?/gi, '');
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a < 0 || b < 0) throw new Error('AI 没有返回 JSON');
+  return JSON.parse(t.slice(a, b + 1));
+}
+function download(name, blob) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000); }
+const fmtTime = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+
+/* ================= 设置（只存本机，不同步） ================= */
+const DEF = {
+  text: { provider: 'openai', base: '', key: '', model: '', visionModel: '' },
+  gpt: { mode: 'images', base: '', key: '', model: 'gpt-image-1', size: '1024x1536' },
+  nai: { mode: 'nai', base: '', key: '', model: 'nai-diffusion-4-5-full', size: '832x1216', steps: 28, scale: 5, sampler: 'k_euler_ancestral' },
+  models: [
+    { match: 'V4\\.5 Curated|4-5-curated', label: 'V4.5 Curated', api: 'nai-diffusion-4-5-curated' },
+    { match: 'V4\\.5|4-5-full', label: 'V4.5', api: 'nai-diffusion-4-5-full' },
+    { match: 'V4 Curated|4-curated', label: 'V4 Curated', api: 'nai-diffusion-4-curated-preview' },
+    { match: 'Diffusion V4\\b|4-full', label: 'V4', api: 'nai-diffusion-4-full' },
+    { match: 'V3|diffusion-3', label: 'V3', api: 'nai-diffusion-3' },
+  ],
+  gh: { owner: '', repo: '', branch: 'main', dir: 'huapu', token: '', auto: true },
+  thumb: 210, theme: 'auto',
+};
+function deepMerge(a, b) { for (const k in b) { if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k]) && a[k] && typeof a[k] === 'object' && !Array.isArray(a[k])) deepMerge(a[k], b[k]); else a[k] = b[k]; } return a; }
+function loadSettings() { try { return deepMerge(structuredClone(DEF), JSON.parse(localStorage.getItem('huapu.settings') || '{}')); } catch { return structuredClone(DEF); } }
+let SET = loadSettings();
+function saveSettings() { localStorage.setItem('huapu.settings', JSON.stringify(SET)); }
+const getPath = (o, p) => p.split('.').reduce((x, k) => x?.[k], o);
+function setPath(o, p, v) { const ks = p.split('.'); let x = o; ks.slice(0, -1).forEach(k => x = x[k]); x[ks.at(-1)] = v; }
+
+/* ================= 状态 ================= */
+const S = {
+  entries: [], vibes: [], folders: [], tags: {}, blobIndex: {},
+  meta: { baseOverride: {}, keepPairs: [], tombstones: {} },
+  view: sessionStorage.getItem('huapu.view') || 'home',
+  filters: { q: '', model: '', vibe: 'any', star: false, folder: '', recipe: false, artist: '' },
+  expanded: new Set(), openPrompts: new Set(), selected: new Set(), hsel: new Set(),
+  selectMode: false, homeFocus: 0, homeRows: [], rowMap: {}, dupPairs: null,
+  dirty: false, syncing: false, syncMsg: '', lastSync: +localStorage.getItem('huapu.lastSync') || 0,
+  animRow: null, pop: null, lb: null,
+};
+
+/* ================= 存储层（可替换） ================= */
+const DB = {
+  db: null,
+  open() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('huapu', 1);
+      r.onupgradeneeded = () => { const d = r.result; for (const s of ['entries', 'blobs', 'vibes', 'folders', 'kv']) if (!d.objectStoreNames.contains(s)) d.createObjectStore(s, { keyPath: s === 'kv' ? 'k' : 'id' }); };
+      r.onsuccess = () => { this.db = r.result; res(); };
+      r.onerror = () => rej(r.error);
+    });
+  },
+  tx(store, mode, fn) {
+    return new Promise((res, rej) => {
+      const t = this.db.transaction(store, mode); const rq = fn(t.objectStore(store)); let out;
+      if (rq) rq.onsuccess = () => { out = rq.result; };
+      t.oncomplete = () => res(out); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+    });
+  },
+  all(s) { return this.tx(s, 'readonly', os => os.getAll()); },
+  keys(s) { return this.tx(s, 'readonly', os => os.getAllKeys()); },
+  get(s, id) { return this.tx(s, 'readonly', os => os.get(id)); },
+  put(s, o) { return this.tx(s, 'readwrite', os => os.put(o)); },
+  del(s, id) { return this.tx(s, 'readwrite', os => os.delete(id)); },
+  async kvGet(k, d) { const r = await this.get('kv', k); return r ? r.v : d; },
+  kvSet(k, v) { return this.put('kv', { k, v }); },
+};
+
+function upsert(arr, o) { const i = arr.findIndex(x => x.id === o.id); if (i < 0) arr.push(o); else arr[i] = o; }
+async function putEntry(e) { e.updatedAt = now(); await DB.put('entries', e); upsert(S.entries, e); markDirty(); }
+function blobRefd(id) { return S.entries.some(e => e.origId === id || e.thumbId === id) || S.vibes.some(v => v.previewId === id || v.fileId === id); }
+async function deleteEntry(id) {
+  const e = S.entries.find(x => x.id === id);
+  S.entries = S.entries.filter(x => x.id !== id);
+  await DB.del('entries', id);
+  S.meta.tombstones[id] = now();
+  for (const k in S.meta.baseOverride) if (S.meta.baseOverride[k] === id) delete S.meta.baseOverride[k];
+  S.openPrompts.delete(id); S.selected.delete(id);
+  await saveMeta();
+  if (e) for (const b of [e.origId, e.thumbId]) if (b && !blobRefd(b)) await DB.del('blobs', b);
+}
+async function putVibe(v) { v.updatedAt = now(); await DB.put('vibes', v); upsert(S.vibes, v); markDirty(); }
+async function deleteVibe(id) {
+  const v = S.vibes.find(x => x.id === id);
+  S.vibes = S.vibes.filter(x => x.id !== id);
+  await DB.del('vibes', id); S.meta.tombstones[id] = now();
+  for (const e of S.entries) if (e.vibes?.some(s => s.vibeId === id)) { e.vibes.forEach(s => { if (s.vibeId === id) s.vibeId = null; }); await putEntry(e); }
+  await saveMeta();
+  if (v) for (const b of [v.previewId, v.fileId]) if (b && !blobRefd(b)) await DB.del('blobs', b);
+}
+async function putFolder(f) { f.updatedAt = now(); await DB.put('folders', f); upsert(S.folders, f); markDirty(); }
+async function deleteFolder(id) {
+  S.folders = S.folders.filter(x => x.id !== id); await DB.del('folders', id); S.meta.tombstones[id] = now();
+  for (const e of S.entries) if (e.folderId === id) { e.folderId = ''; await putEntry(e); }
+  await saveMeta();
+}
+async function saveMeta() { await DB.kvSet('meta', S.meta); markDirty(); }
+async function saveTags() { await DB.kvSet('tags', S.tags); markDirty(); }
+async function putBlob(id, blob, kind) { await DB.put('blobs', { id, blob, kind, mime: blob.type || 'application/octet-stream' }); }
+async function getBlob(id) {
+  if (!id) return null;
+  const r = await DB.get('blobs', id);
+  if (r) return r.blob;
+  return await ghFetchBlob(id);
+}
+const urlCache = new Map();
+async function blobURL(id) {
+  if (!id) return null;
+  if (urlCache.has(id)) return urlCache.get(id);
+  const b = await getBlob(id).catch(() => null);
+  if (!b) return null;
+  const u = URL.createObjectURL(b); urlCache.set(id, u); return u;
+}
+
+/* ================= 模型名映射 ================= */
+function modelLabel(raw) {
+  if (!raw) return '';
+  for (const m of SET.models) { try { if (new RegExp(m.match, 'i').test(raw)) return m.label; } catch { } }
+  return raw;
+}
+const entryModel = e => modelLabel(e.params?.modelRaw);
+const modelApi = label => SET.models.find(m => m.label === label)?.api || label;
+
+/* ================= 分词 ================= */
+function normTag(s) {
+  return String(s).replace(/^\s*artist\s*:\s*/i, '').replace(/\\([()[\]{}])/g, '$1').replace(/_/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+function tokenize(prompt) {
+  const out = []; if (!prompt) return out;
+  let curly = 0, square = 0, num = null, buf = '', tw = null;
+  const cur = () => (num ?? 1) * Math.pow(1.05, curly - square);
+  const flush = () => {
+    const raw = buf.replace(/\s+/g, ' ').trim();
+    if (raw) { const n = normTag(raw); if (n) out.push({ raw, n, w: Math.round((tw ?? 1) * 100) / 100, pre: /^artist\s*:/i.test(raw) }); }
+    buf = ''; tw = null;
+  };
+  const s = String(prompt);
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === '\\' && i + 1 < s.length) { buf += s[i + 1]; i++; if (tw === null) tw = cur(); continue; }
+    if (ch === ',' || ch === '\n' || ch === '|' || ch === '，') { flush(); continue; }
+    if (ch === '{') { curly++; continue; }
+    if (ch === '}') { curly = Math.max(0, curly - 1); continue; }
+    if (ch === '[') { square++; continue; }
+    if (ch === ']') { square = Math.max(0, square - 1); continue; }
+    if (ch === ':' && s[i + 1] === ':' && num !== null) { flush(); num = null; i++; continue; }
+    if (num === null && !buf.trim()) {
+      const m = s.slice(i, i + 12).match(/^(-?\d+(?:\.\d+)?)::/);
+      if (m) { num = parseFloat(m[1]); i += m[0].length - 1; continue; }
+    }
+    buf += ch; if (tw === null && ch.trim()) tw = cur();
+  }
+  flush(); return out;
+}
+
+/* ================= 分类 ================= */
+const GENERAL = new Set(['masterpiece', 'best quality', 'amazing quality', 'very aesthetic', 'aesthetic', 'absurdres', 'highres', 'high quality', 'ultra detailed', 'ultra-detailed', 'newest', 'very awa', 'incredibly absurdres', 'high resolution', 'no text', 'location', 'lowres', 'normal quality', 'worst quality', 'bad quality', 'low quality', 'displeasing', 'very displeasing', '8k', '4k', 'official art', 'highly detailed', 'detailed', 'great quality', 'good quality', 'extremely detailed']);
+const CATS = { artist: '画师', style: '风格', general: '通用', scene: '画面' };
+function catOf(t) {
+  if (t.pre) return 'artist';
+  const c = S.tags[t.n]; if (c) return c.c;
+  if (GENERAL.has(t.n) || /^rating\s*:/.test(t.n)) return 'general';
+  return 'pending';
+}
+function artistsOf(e) {
+  if (e.artistOverride) return e.artistOverride;
+  const seen = new Set(), out = [];
+  for (const t of e.tokens || []) if (catOf(t) === 'artist' && !seen.has(t.n)) { seen.add(t.n); out.push({ n: t.n, w: t.w }); }
+  return out;
+}
+function groupKey(e) { const a = [...new Set(artistsOf(e).map(x => x.n))].sort(); return a.length ? a.join(' | ') : '__none__'; }
+function buildRows(list) {
+  const m = new Map();
+  for (const e of list) { const k = groupKey(e); if (!m.has(k)) m.set(k, []); m.get(k).push(e); }
+  const rows = [...m].map(([key, items]) => {
+    items.sort((a, b) => a.createdAt - b.createdAt);
+    const ov = S.meta.baseOverride[key];
+    const base = items.find(x => x.id === ov) || items[0];
+    const rest = items.filter(x => x !== base);
+    const names = key === '__none__' ? [] : artistsOf(base).map(a => a.n);
+    return { key, id: 'r' + hashStr(key), base, rest, items: [base, ...rest], names, sort: key === '__none__' ? '\uffff' : (names[0] || '\uffff') };
+  });
+  rows.sort((a, b) => a.sort.localeCompare(b.sort) || a.key.localeCompare(b.key));
+  return rows;
+}
+function compTokens(e) {
+  const out = [], seen = new Set();
+  for (const a of artistsOf(e)) { const k = 'artist:' + a.n; if (!seen.has(k)) { seen.add(k); out.push({ n: a.n, w: a.w, c: 'artist' }); } }
+  for (const t of e.tokens || []) if (!t.pre && catOf(t) === 'style') { const k = 'style:' + t.n; if (!seen.has(k)) { seen.add(k); out.push({ n: t.n, w: t.w, c: 'style' }); } }
+  return out;
+}
+const vibeKey = e => (e.vibes || []).map(v => (v.vibeId || v.sig || '?') + '@' + v.strength).join(',');
+function diffEntry(e, b) {
+  const bm = new Map(compTokens(b).map(t => [t.c + ':' + t.n, t]));
+  const em = compTokens(e);
+  const marks = em.map(t => { const o = bm.get(t.c + ':' + t.n); return { ...t, st: !o ? 'add' : Math.abs(o.w - t.w) > 0.004 ? 'w' : 'same', bw: o?.w }; });
+  const keys = new Set(em.map(t => t.c + ':' + t.n));
+  const removed = [...bm.values()].filter(t => !keys.has(t.c + ':' + t.n));
+  return { marks, removed, seed: (e.params?.seed ?? null) !== (b.params?.seed ?? null), vibe: vibeKey(e) !== vibeKey(b) };
+}
+function artistSig(e) { const a = artistsOf(e); return a.length ? a.map(x => x.n + '@' + x.w).sort().join('|') : null; }
+const pairKey = (a, b) => [a.id, b.id].sort().join('|');
+function findDupFor(e) {
+  const s = artistSig(e); if (!s) return null;
+  return S.entries.find(o => o.id !== e.id && artistSig(o) === s && !S.meta.keepPairs.includes(pairKey(o, e))) || null;
+}
+function scanDups() {
+  const m = new Map(), pairs = [];
+  for (const e of [...S.entries].sort((a, b) => a.createdAt - b.createdAt)) {
+    const s = artistSig(e); if (!s) continue;
+    if (!m.has(s)) { m.set(s, [e]); continue; }
+    const first = m.get(s).find(o => !S.meta.keepPairs.includes(pairKey(o, e)));
+    if (first) pairs.push([first, e]);
+    m.get(s).push(e);
+  }
+  const hm = new Map();
+  for (const e of S.entries) if (e.fileHash) { if (hm.has(e.fileHash)) pairs.push([hm.get(e.fileHash), e, 'hash']); else hm.set(e.fileHash, e); }
+  return pairs;
+}
+function pendingTags() { const p = new Set(); for (const e of S.entries) for (const t of e.tokens || []) if (catOf(t) === 'pending') p.add(t.n); return [...p]; }
+
+/* ================= 文字 AI ================= */
+const aiReady = () => !!SET.text.key;
+function v1(base, def) { let b = (base || def || '').trim().replace(/\/+$/, ''); if (!/\/v\d+(beta)?$/.test(b)) b += '/v1'; return b; }
+const hdr = key => ({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + key });
+async function apiErr(r, who = '') { let t = ''; try { t = await r.text(); } catch { } return new Error(`${who}${r.status} ${t.slice(0, 220)}`); }
+async function aiChat(messages, { json = true, image = null } = {}) {
+  const st = SET.text; if (!st.key) throw new Error('先在设置里填文字 API 的 Key');
+  if (st.provider === 'gemini') {
+    const base = (st.base || 'https://generativelanguage.googleapis.com').replace(/\/+$/, '');
+    const model = (image && st.visionModel) || st.model || 'gemini-2.5-flash';
+    const parts = [{ text: messages.map(m => m.content).join('\n\n') }];
+    if (image) parts.push({ inline_data: { mime_type: image.mime, data: image.b64 } });
+    const r = await fetch(`${base}/v1beta/models/${model}:generateContent?key=${encodeURIComponent(st.key)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ role: 'user', parts }], generationConfig: json ? { responseMimeType: 'application/json', temperature: 0 } : { temperature: 0 } }),
+    });
+    if (!r.ok) throw await apiErr(r, 'Gemini ');
+    const j = await r.json(); return (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+  }
+  const base = v1(st.base, st.provider === 'deepseek' ? 'https://api.deepseek.com' : 'https://api.openai.com');
+  const model = (image && st.visionModel) || st.model || (st.provider === 'deepseek' ? 'deepseek-chat' : 'gpt-4o-mini');
+  let msgs = messages;
+  if (image) { const last = messages.at(-1); msgs = [...messages.slice(0, -1), { role: 'user', content: [{ type: 'text', text: last.content }, { type: 'image_url', image_url: { url: `data:${image.mime};base64,${image.b64}` } }] }]; }
+  const send = async rf => {
+    const body = { model, messages: msgs, temperature: 0 }; if (rf) body.response_format = { type: 'json_object' };
+    return fetch(base + '/chat/completions', { method: 'POST', headers: hdr(st.key), body: JSON.stringify(body) });
+  };
+  let r = await send(json);
+  if (!r.ok && json && r.status === 400) r = await send(false);
+  if (!r.ok) throw await apiErr(r);
+  const j = await r.json(); const c = j.choices?.[0]?.message?.content;
+  return typeof c === 'string' ? c : Array.isArray(c) ? c.map(x => x.text || '').join('') : '';
+}
+const CLS_PROMPT = `你是 NovelAI / Danbooru 提示词分类器。把每个标签归入以下之一：
+artist：画师/插画师名（即使没有 artist: 前缀，例如 wlop、mika pikazo、ningen mame）
+style：影响画风、媒介、渲染方式的词（3d、render、flat color、game cg、anime coloring、watercolor、year 2025、某游戏或作品的美术风格如 love and deepspace）
+general：质量/通用词（masterpiece、best quality、amazing quality、very aesthetic、absurdres、highres、no text 等）
+scene：画面内容（人物数量、角色名、姿势、表情、服装、场景、构图、镜头）
+只返回 JSON：{"tags":{"原样标签":"类别"}}，类别只能是 artist/style/general/scene。`;
+async function aiClassify(tags) { const t = await aiChat([{ role: 'system', content: CLS_PROMPT }, { role: 'user', content: JSON.stringify(tags) }]); const j = parseJSONLoose(t); return j.tags || j; }
+let classifying = false;
+async function classifyPending(quiet) {
+  if (classifying || !aiReady()) return;
+  const list = pendingTags(); if (!list.length) return;
+  classifying = true;
+  const t = quiet ? null : toast(`AI 正在给 ${list.length} 个新词分类…`, 600000);
+  try {
+    for (let i = 0; i < list.length; i += 120) {
+      const chunk = list.slice(i, i + 120);
+      const res = await aiClassify(chunk);
+      const lower = {}; for (const k in res) lower[normTag(k)] = res[k];
+      for (const n of chunk) { const c = String(lower[n] || '').toLowerCase(); S.tags[n] = { c: CATS[c] ? c : 'scene' }; }
+      await saveTags();
+    }
+    t?.remove(); render();
+  } catch (err) { t?.remove(); toast('AI 分类失败：' + esc(err.message), 5000); }
+  finally { classifying = false; }
+}
+const OCR_PROMPT = `这是一张 NovelAI 生图参数的截图。请读出其中的文字，整理成 JSON：
+{"prompt":"正面提示词原文","negative":"负面提示词原文","seed":数字或null,"steps":数字或null,"scale":数字或null,"sampler":"","model":"模型名或空","width":null,"height":null,"vibe_strengths":[数字]}
+要求：保留逗号分隔、花括号/方括号和 1.2:: 这类权重写法；识别不清的画师名按 Danbooru 常见写法校正（小写，空格分词，例如 artist:ningen mame）；看不到的字段填 null。只返回 JSON。`;
+
+/* ================= PNG 元数据 ================= */
+async function pngChunks(buf) {
+  const u = new Uint8Array(buf), dv = new DataView(buf), out = {};
+  if (u[0] !== 0x89 || u[1] !== 0x50) return out;
+  let p = 8;
+  while (p + 8 <= u.length) {
+    const len = dv.getUint32(p);
+    const type = String.fromCharCode(u[p + 4], u[p + 5], u[p + 6], u[p + 7]);
+    const d = u.subarray(p + 8, p + 8 + len);
+    try {
+      if (type === 'tEXt') { const z = d.indexOf(0); out[td.decode(d.subarray(0, z))] = td.decode(d.subarray(z + 1)); }
+      else if (type === 'iTXt') {
+        const z = d.indexOf(0); const key = td.decode(d.subarray(0, z)); const cf = d[z + 1];
+        let q = z + 3; q = d.indexOf(0, q) + 1; q = d.indexOf(0, q) + 1;
+        let txt = d.subarray(q); if (cf) txt = await inflate(txt, 'deflate'); out[key] = td.decode(txt);
+      } else if (type === 'zTXt') { const z = d.indexOf(0); out[td.decode(d.subarray(0, z))] = td.decode(await inflate(d.subarray(z + 2), 'deflate')); }
+      else if (type === 'IEND') break;
+    } catch { }
+    p += 12 + len;
+  }
+  return out;
+}
+async function readStealth(blob) {
+  try {
+    const bmp = await createImageBitmap(blob, { premultiplyAlpha: 'none', colorSpaceConversion: 'none' });
+    const w = bmp.width, h = bmp.height;
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const ctx = c.getContext('2d', { willReadFrequently: true }); ctx.drawImage(bmp, 0, 0); bmp.close?.();
+    const px = ctx.getImageData(0, 0, w, h).data; const total = w * h;
+    let idx = 0;
+    const bit = () => { const x = (idx / h) | 0, y = idx % h; idx++; return px[(y * w + x) * 4 + 3] & 1; };
+    const bytes = n => { const o = new Uint8Array(n); for (let i = 0; i < n; i++) { let v = 0; for (let b = 0; b < 8; b++) v = (v << 1) | bit(); o[i] = v; } return o; };
+    const magic = td.decode(bytes(15));
+    if (magic !== 'stealth_pngcomp' && magic !== 'stealth_pnginfo') return null;
+    let L = 0; for (let b = 0; b < 32; b++) L = L * 2 + bit();
+    if (L <= 0 || L > total - 152) return null;
+    let data = bytes(Math.floor(L / 8));
+    if (magic === 'stealth_pngcomp') data = await inflate(data, 'gzip');
+    return JSON.parse(td.decode(data));
+  } catch { return null; }
+}
+function metaFrom(ch) {
+  if (!ch) return null;
+  let c = null;
+  if (ch.Comment) { if (typeof ch.Comment === 'object') c = ch.Comment; else try { c = JSON.parse(ch.Comment); } catch { } }
+  if (c) {
+    const v4 = c.v4_prompt?.caption, v4n = c.v4_negative_prompt?.caption;
+    const strengths = c.reference_strength_multiple || (c.reference_strength != null ? [c.reference_strength] : []);
+    const infos = c.reference_information_extracted_multiple || [];
+    const sigSrc = []; for (const k in c) if (/reference_image|vibe|encod/i.test(k) && c[k]) sigSrc.push(c[k]);
+    const vibes = (strengths || []).map((s, i) => {
+      let src = null; for (const v of sigSrc) { if (Array.isArray(v) && typeof v[i] === 'string') { src = v[i]; break; } if (typeof v === 'string' && i === 0) { src = v; break; } }
+      return { strength: Math.round(+s * 100) / 100, info: infos[i] != null ? +infos[i] : null, sig: src ? 'h' + hashStr(src) : null, vibeId: null };
+    });
+    return {
+      prompt: v4?.base_caption || c.prompt || ch.Description || '',
+      chars: (v4?.char_captions || []).map(x => x.char_caption).filter(Boolean),
+      negative: v4n?.base_caption ?? c.uc ?? '',
+      params: { seed: c.seed ?? null, steps: c.steps ?? null, scale: c.scale ?? null, sampler: c.sampler || '', width: c.width || null, height: c.height || null, modelRaw: ch.Source || c.model || '' },
+      vibes,
+    };
+  }
+  if (ch.parameters) {
+    const t = ch.parameters; const ni = t.indexOf('Negative prompt:'); const si = t.search(/\nSteps:/);
+    const prompt = (ni >= 0 ? t.slice(0, ni) : si >= 0 ? t.slice(0, si) : t).trim();
+    const negative = ni >= 0 ? t.slice(ni + 16, si > ni ? si : undefined).trim() : '';
+    const g = k => { const m = t.match(new RegExp(k + ': ([^,\\n]+)')); return m ? m[1].trim() : null; };
+    const size = g('Size');
+    return { prompt, negative, chars: [], params: { seed: +g('Seed') || null, steps: +g('Steps') || null, scale: +g('CFG scale') || null, sampler: g('Sampler') || '', width: size ? +size.split('x')[0] : null, height: size ? +size.split('x')[1] : null, modelRaw: g('Model') || '' }, vibes: [] };
+  }
+  if (ch.Description) return { prompt: ch.Description, negative: '', chars: [], params: { modelRaw: ch.Source || '' }, vibes: [] };
+  return null;
+}
+async function readMeta(buf, blob) {
+  const m = metaFrom(await pngChunks(buf)); if (m?.prompt) return m;
+  const st = await readStealth(blob); const m2 = metaFrom(st); if (m2?.prompt) return m2;
+  return null;
+}
+async function makeThumb(blob, max = 640, type = 'image/webp') {
+  const bmp = await createImageBitmap(blob);
+  const r = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const w = Math.round(bmp.width * r), h = Math.round(bmp.height * r);
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  c.getContext('2d').drawImage(bmp, 0, 0, w, h);
+  const dims = { w: bmp.width, h: bmp.height }; bmp.close?.();
+  let t = await new Promise(res => c.toBlob(res, type, 0.86));
+  if (!t || (type === 'image/webp' && t.type !== 'image/webp')) t = await new Promise(res => c.toBlob(res, 'image/jpeg', 0.86));
+  return { blob: t, ...dims };
+}
+
+/* ================= 生图 ================= */
+async function fetchImageBlob(url) { const r = await fetch(url); if (!r.ok) throw new Error('取图失败 ' + r.status); return await r.blob(); }
+function findImageInText(t) {
+  const m = String(t).match(/data:image\/[a-z]+;base64,[A-Za-z0-9+/=]+/); if (m) return dataURLtoBlob(m[0]);
+  const md = String(t).match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+)\)/); if (md) return md[1];
+  const u = String(t).match(/https?:\/\/[^\s)"'<>]+\.(?:png|jpe?g|webp)[^\s)"'<>]*/i); return u ? u[0] : null;
+}
+async function toImage(found) { if (!found) throw new Error('回复里没找到图片'); return found instanceof Blob ? found : await fetchImageBlob(found); }
+async function parseImagesResponse(r) {
+  const j = await r.json(); const d = j.data?.[0];
+  if (d?.b64_json) return b64ToBlob(d.b64_json, 'image/png');
+  if (d?.url) return d.url.startsWith('data:') ? dataURLtoBlob(d.url) : await fetchImageBlob(d.url);
+  return await toImage(findImageInText(JSON.stringify(j)));
+}
+async function genGPT({ prompt, size }) {
+  const g = SET.gpt; if (!g.key) throw new Error('先在设置里填 GPT 生图 API');
+  const base = v1(g.base, 'https://api.openai.com');
+  if (g.mode === 'chat') {
+    const r = await fetch(base + '/chat/completions', { method: 'POST', headers: hdr(g.key), body: JSON.stringify({ model: g.model, messages: [{ role: 'user', content: prompt }] }) });
+    if (!r.ok) throw await apiErr(r, 'GPT ');
+    const j = await r.json(); const msg = j.choices?.[0]?.message || {};
+    let t = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content || '');
+    if (msg.images?.[0]?.image_url?.url) t = msg.images[0].image_url.url + ' ' + t;
+    return await toImage(findImageInText(t));
+  }
+  const r = await fetch(base + '/images/generations', { method: 'POST', headers: hdr(g.key), body: JSON.stringify({ model: g.model, prompt, size: size || g.size, n: 1 }) });
+  if (!r.ok) throw await apiErr(r, 'GPT ');
+  return await parseImagesResponse(r);
+}
+async function unzipFirst(u8) {
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  let e = -1; for (let i = u8.length - 22; i >= 0; i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  let method, csize, off;
+  if (e >= 0) { const cd = dv.getUint32(e + 16, true); method = dv.getUint16(cd + 10, true); csize = dv.getUint32(cd + 20, true); off = dv.getUint32(cd + 42, true); }
+  else { method = dv.getUint16(8, true); csize = dv.getUint32(18, true); off = 0; }
+  const nl = dv.getUint16(off + 26, true), xl = dv.getUint16(off + 28, true);
+  const data = u8.subarray(off + 30 + nl + xl, off + 30 + nl + xl + csize);
+  return method === 0 ? data : await inflate(data, 'deflate-raw');
+}
+async function genNAI({ prompt, negative, model, size, seed, steps, scale, sampler, vibes }) {
+  const n = SET.nai; if (!n.key) throw new Error('先在设置里填 NAI 生图 API');
+  const [w, h] = (size || n.size).split('x').map(Number);
+  const mdl = model || n.model;
+  const sd = seed ?? Math.floor(Math.random() * 4294967295);
+  if (n.mode === 'openai') {
+    const r = await fetch(v1(n.base) + '/images/generations', { method: 'POST', headers: hdr(n.key), body: JSON.stringify({ model: mdl, prompt, negative_prompt: negative || '', size: `${w}x${h}`, n: 1, seed: sd, steps: steps ?? n.steps, scale: scale ?? n.scale, sampler: sampler || n.sampler }) });
+    if (!r.ok) throw await apiErr(r, 'NAI ');
+    return { blob: await parseImagesResponse(r), seed: sd };
+  }
+  const params = {
+    params_version: 3, width: w, height: h, scale: scale ?? n.scale, sampler: sampler || n.sampler, steps: steps ?? n.steps, n_samples: 1, seed: sd,
+    ucPreset: 0, qualityToggle: false, sm: false, sm_dyn: false, dynamic_thresholding: false, cfg_rescale: 0, noise_schedule: 'karras',
+    legacy: false, add_original_image: true, prefer_brownian: true, deliberate_euler_ancestral_bug: false, use_coords: false,
+    negative_prompt: negative || '', characterPrompts: [],
+    v4_prompt: { caption: { base_caption: prompt, char_captions: [] }, use_coords: false, use_order: true },
+    v4_negative_prompt: { caption: { base_caption: negative || '', char_captions: [] }, legacy_uc: false },
+  };
+  if (vibes?.length) {
+    params.reference_image_multiple = vibes.map(v => v.enc);
+    params.reference_strength_multiple = vibes.map(v => v.strength ?? 0.6);
+    params.reference_information_extracted_multiple = vibes.map(v => v.info ?? 1);
+  }
+  const base = (n.base || 'https://image.novelai.net').replace(/\/+$/, '');
+  const r = await fetch(base + '/ai/generate-image', { method: 'POST', headers: hdr(n.key), body: JSON.stringify({ input: prompt, model: mdl, action: 'generate', parameters: params }) });
+  if (!r.ok) throw await apiErr(r, 'NAI ');
+  const ct = r.headers.get('content-type') || ''; const u8 = new Uint8Array(await r.arrayBuffer());
+  if (u8[0] === 0x50 && u8[1] === 0x4b) return { blob: new Blob([await unzipFirst(u8)], { type: 'image/png' }), seed: sd };
+  if (ct.startsWith('image/') || u8[0] === 0x89) return { blob: new Blob([u8], { type: ct.startsWith('image/') ? ct : 'image/png' }), seed: sd };
+  const t = td.decode(u8);
+  try {
+    const j = JSON.parse(t); const b = j.data?.[0]?.b64_json || j.data?.[0]?.url || j.image || j.images?.[0] || (typeof j.data === 'string' ? j.data : null);
+    if (typeof b === 'string') return { blob: b.startsWith('http') ? await fetchImageBlob(b) : b64ToBlob(b.replace(/^data:image\/\w+;base64,/, ''), 'image/png'), seed: sd };
+  } catch { }
+  return { blob: await toImage(findImageInText(t)), seed: sd };
+}
+
+/* ================= vibe 文件 ================= */
+function firstEncoding(j) { for (const k in j.encodings || {}) for (const k2 in j.encodings[k]) { const e = j.encodings[k][k2]?.encoding; if (e) return e; } return null; }
+function vibeModelsFromFile(j) { const s = new Set(); for (const k in j.encodings || {}) { if (/^v4-5/.test(k)) s.add('V4.5'); else if (/^v4/.test(k)) s.add('V4'); else if (/^v5/.test(k)) s.add('V5'); } return [...s]; }
+async function getVibeEncoding(v, api) {
+  if (!v?.fileId) return null;
+  const b = await getBlob(v.fileId); if (!b) return null;
+  try {
+    const j = JSON.parse(await b.text());
+    const key = 'v' + String(api).replace('nai-diffusion-', '').replace(/-(full|curated)(-preview)?$/, '$1');
+    const grp = j.encodings?.[key]; if (grp) for (const k in grp) if (grp[k]?.encoding) return grp[k].encoding;
+    return null;
+  } catch { return null; }
+}
+
+/* ================= GitHub 同步 ================= */
+const GH = {
+  ok() { const g = SET.gh; return !!(g.owner && g.repo && g.token); },
+  p(name) { return `${(SET.gh.dir || 'huapu').replace(/^\/+|\/+$/g, '')}/${name}`; },
+  api(path, opt = {}) {
+    const g = SET.gh;
+    return fetch(`https://api.github.com/repos/${g.owner}/${g.repo}${path}`, { ...opt, headers: { Authorization: 'Bearer ' + g.token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', ...(opt.body ? { 'Content-Type': 'application/json' } : {}) } });
+  },
+  async meta(name) {
+    const r = await this.api(`/contents/${this.p(name)}?ref=${encodeURIComponent(SET.gh.branch || 'main')}`);
+    if (r.status === 404) return null;
+    if (!r.ok) throw await apiErr(r, 'GitHub ');
+    return await r.json();
+  },
+  async getJSON(name) {
+    const j = await this.meta(name); if (!j) return { data: null, sha: null };
+    let b64 = j.content;
+    if (!b64 || j.encoding === 'none') b64 = (await this.blobJSON(j.sha)).content;
+    return { data: JSON.parse(td.decode(b64ToU8(b64))), sha: j.sha };
+  },
+  async blobJSON(sha) { const r = await this.api(`/git/blobs/${sha}`); if (!r.ok) throw await apiErr(r, 'GitHub '); return await r.json(); },
+  async put(name, b64, sha, msg) {
+    const r = await this.api(`/contents/${this.p(name)}`, { method: 'PUT', body: JSON.stringify({ message: msg || ('sync ' + name), content: b64, branch: SET.gh.branch || 'main', ...(sha ? { sha } : {}) }) });
+    if (!r.ok) { const e = await apiErr(r, 'GitHub '); e.status = r.status; throw e; }
+    return (await r.json()).content.sha;
+  },
+};
+async function ghFetchBlob(id) {
+  const ix = S.blobIndex[id]; if (!ix || !GH.ok()) return null;
+  try {
+    const j = await GH.blobJSON(ix.sha);
+    const blob = b64ToBlob(j.content, ix.mime);
+    await putBlob(id, blob, ix.kind || 'orig');
+    return blob;
+  } catch { return null; }
+}
+function localLib() {
+  return { v: 1, entries: S.entries, vibes: S.vibes, folders: S.folders, tags: S.tags, meta: S.meta, blobs: S.blobIndex };
+}
+function mergeLib(L, R) {
+  if (!R) return structuredClone(L);
+  const tomb = { ...(R.meta?.tombstones || {}) };
+  for (const [k, v] of Object.entries(L.meta?.tombstones || {})) tomb[k] = Math.max(tomb[k] || 0, v);
+  const mergeColl = (a = [], b = []) => {
+    const m = new Map();
+    for (const x of [...b, ...a]) { const c = m.get(x.id); if (!c || (x.updatedAt || 0) >= (c.updatedAt || 0)) m.set(x.id, x); }
+    return [...m.values()].filter(x => !(tomb[x.id] >= (x.updatedAt || 0)));
+  };
+  const tags = { ...(R.tags || {}) };
+  for (const k in L.tags || {}) if (!tags[k] || L.tags[k].m || !tags[k].m) tags[k] = L.tags[k];
+  return {
+    v: 1,
+    entries: mergeColl(L.entries, R.entries), vibes: mergeColl(L.vibes, R.vibes), folders: mergeColl(L.folders, R.folders),
+    tags,
+    meta: { baseOverride: { ...(R.meta?.baseOverride || {}), ...(L.meta?.baseOverride || {}) }, keepPairs: [...new Set([...(R.meta?.keepPairs || []), ...(L.meta?.keepPairs || [])])], tombstones: tomb },
+    blobs: { ...(R.blobs || {}), ...(L.blobs || {}) },
+  };
+}
+async function applyLib(M) {
+  let changed = false;
+  for (const coll of ['entries', 'vibes', 'folders']) {
+    const cur = new Map(S[coll].map(x => [x.id, x]));
+    const inc = new Map((M[coll] || []).map(x => [x.id, x]));
+    for (const id of cur.keys()) if (!inc.has(id)) { await DB.del(coll, id); changed = true; }
+    const next = [];
+    for (const x of inc.values()) {
+      const c = cur.get(x.id);
+      if (!c || (x.updatedAt || 0) > (c.updatedAt || 0)) { await DB.put(coll, x); next.push(x); changed = true; }
+      else next.push(c);
+    }
+    S[coll] = next;
+  }
+  S.tags = M.tags || S.tags;
+  S.meta = Object.assign({ baseOverride: {}, keepPairs: [], tombstones: {} }, M.meta || {});
+  S.blobIndex = M.blobs || {};
+  await DB.kvSet('tags', S.tags); await DB.kvSet('meta', S.meta); await DB.kvSet('blobIndex', S.blobIndex);
+  return changed;
+}
+let dirtyTimer = null;
+function markDirty() {
+  S.dirty = true;
+  if (SET.gh.auto && GH.ok()) { clearTimeout(dirtyTimer); dirtyTimer = setTimeout(() => sync(), 20000); }
+  renderSyncBadge?.();
+}
+async function sync(manual) {
+  if (S.syncing) return;
+  if (!GH.ok()) { if (manual) toast('先在设置里填 GitHub 仓库和令牌'); return; }
+  S.syncing = true; S.syncMsg = '同步中'; renderSyncBadge();
+  let changed = false;
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { data: remote, sha } = await GH.getJSON('library.json');
+      changed = (await applyLib(mergeLib(localLib(), remote))) || changed;
+      const keys = new Set(await DB.keys('blobs'));
+      const refs = [];
+      for (const e of S.entries) { if (e.thumbId) refs.push([e.thumbId, 'thumb']); if (e.origId) refs.push([e.origId, 'orig']); }
+      for (const v of S.vibes) { if (v.previewId) refs.push([v.previewId, 'thumb']); if (v.fileId) refs.push([v.fileId, 'file']); }
+      const toUp = refs.filter(([id]) => !S.blobIndex[id] && keys.has(id));
+      let i = 0;
+      for (const [id, kind] of toUp) {
+        i++; S.syncMsg = `上传 ${i}/${toUp.length}`; renderSyncBadge();
+        const rec = await DB.get('blobs', id); if (!rec) continue;
+        let bsha;
+        try { bsha = await GH.put('blobs/' + id, await blobToB64(rec.blob), null, 'blob ' + id); }
+        catch (err) { if (err.status === 422) { const m = await GH.meta('blobs/' + id); if (!m) throw err; bsha = m.sha; } else throw err; }
+        S.blobIndex[id] = { sha: bsha, mime: rec.mime || rec.blob.type, kind };
+        await DB.kvSet('blobIndex', S.blobIndex);
+      }
+      const toDown = refs.filter(([id, kind]) => kind !== 'orig' && S.blobIndex[id] && !keys.has(id));
+      i = 0;
+      for (const [id] of toDown) { i++; S.syncMsg = `下载 ${i}/${toDown.length}`; renderSyncBadge(); await ghFetchBlob(id); changed = true; }
+      try {
+        S.syncMsg = '写入索引'; renderSyncBadge();
+        await GH.put('library.json', utf8B64(JSON.stringify(localLib())), sha, 'sync library');
+        break;
+      } catch (err) { if ((err.status === 409 || err.status === 422) && attempt < 2) continue; throw err; }
+    }
+    S.dirty = false; S.lastSync = now(); localStorage.setItem('huapu.lastSync', S.lastSync);
+    if (manual) toast('同步完成');
+  } catch (err) { toast('同步失败：' + esc(err.message), 6000); }
+  finally { S.syncing = false; S.syncMsg = ''; renderSyncBadge(); if (changed) render(); }
+}
+
+/* ================= 导出导入 ================= */
+async function exportAll(withBlobs) {
+  const t = toast('正在打包…', 600000);
+  try {
+    const data = structuredClone(localLib());
+    if (withBlobs) {
+      data.files = {};
+      for (const rec of await DB.all('blobs')) data.files[rec.id] = { mime: rec.mime, kind: rec.kind, b64: await blobToB64(rec.blob) };
+    }
+    const d = new Date();
+    download(`huapu-${withBlobs ? 'full' : 'data'}-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}.json`, new Blob([JSON.stringify(data)], { type: 'application/json' }));
+  } finally { t.remove(); }
+}
+async function importLib(file) {
+  const t = toast('正在导入备份…', 600000);
+  try {
+    const data = JSON.parse(await file.text());
+    if (data.files) for (const [id, f] of Object.entries(data.files)) await putBlob(id, b64ToBlob(f.b64, f.mime), f.kind);
+    delete data.files;
+    await applyLib(mergeLib(localLib(), data));
+    markDirty(); render(); toast('导入完成');
+  } catch (err) { toast('导入失败：' + esc(err.message), 5000); }
+  finally { t.remove(); }
+}
+/* ================= 图标 ================= */
+const IC = {
+  home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
+  rows: '<rect x="3" y="4" width="18" height="6" rx="2"/><rect x="3" y="14" width="18" height="6" rx="2"/>',
+  vibe: '<path d="M12 3l2.4 5.6L20 11l-5.6 2.4L12 19l-2.4-5.6L4 11l5.6-2.4z"/>',
+  artist: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  dup: '<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  folder: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/>',
+  text: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+  star: '<path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"/>',
+  expand: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
+  copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>',
+  trash: '<path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16z"/>',
+  wand: '<path d="M15 4V2M15 10V8M11 6h2M17 6h2M4 20l10-10"/><path d="M19 13v2M18 14h2"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
+  check: '<path d="M5 12l5 5 9-10"/>',
+  chev: '<path d="M9 6l6 6-6 6"/>',
+  sync: '<path d="M20 11a8 8 0 0 0-14.3-4.3L4 8M4 13a8 8 0 0 0 14.3 4.3L20 16"/><path d="M4 4v4h4M20 20v-4h-4"/>',
+  x: '<path d="M6 6l12 12M18 6L6 18"/>',
+  cloud: '<path d="M7 18a5 5 0 1 1 .9-9.9A6 6 0 0 1 19 10a4 4 0 0 1-1 8z"/>',
+};
+const ic = (n, s = 16) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${IC[n] || ''}</svg>`;
+const SRC = { png: '原图', screenshot: '截图', text: '文字串', gen: '生图' };
+const VIEWS = [['home', '首页', 'home'], ['library', '画师串', 'rows'], ['vibes', 'Vibe', 'vibe'], ['artists', '画师索引', 'artist'], ['dups', '查重', 'dup'], ['settings', '设置', 'gear']];
+
+/* ================= 弹层 ================= */
+function toast(msg, ms = 2600) {
+  const t = document.createElement('div'); t.className = 'toast glass'; t.innerHTML = msg; $('#toasts').append(t);
+  setTimeout(() => { t.classList.add('out'); setTimeout(() => t.remove(), 300); }, ms); return t;
+}
+function openModal(html, { wide = false, cls = '' } = {}) {
+  const m = document.createElement('div'); m.className = 'mask';
+  m.innerHTML = `<div class="modal ${wide ? 'wide' : ''} ${cls}">${html}</div>`;
+  $('#modals').append(m);
+  m.addEventListener('mousedown', ev => { if (ev.target === m) closeModal(m); });
+  observeThumbs(m); return m;
+}
+function closeModal(m) {
+  m = m || $('#modals .mask:last-child'); if (!m || m._closing) return;
+  m._closing = true; m.classList.add('out'); setTimeout(() => m.remove(), 180); m._resolve?.(m._value ?? null);
+}
+function ask(title, body, buttons = [{ t: '取消', v: false }, { t: '确定', v: true, cls: 'pri' }]) {
+  return new Promise(res => {
+    const m = openModal(`<h3>${title}</h3>${body ? `<div class="ask-body">${body}</div>` : ''}<div class="m-actions">${buttons.map((b, i) => `<button class="btn ${b.cls || ''}" data-i="${i}">${b.t}</button>`).join('')}</div>`);
+    m._resolve = res;
+    $$('.m-actions button', m).forEach(b => b.onclick = () => { m._value = buttons[+b.dataset.i].v; closeModal(m); });
+  });
+}
+function promptText(title, val = '', ph = '') {
+  return new Promise(res => {
+    const m = openModal(`<h3>${title}</h3><input class="inp" id="ptIn" value="${esc(val)}" placeholder="${esc(ph)}"><div class="m-actions"><button class="btn" data-x>取消</button><button class="btn pri" data-ok>确定</button></div>`);
+    m._resolve = res; const i = $('#ptIn', m); setTimeout(() => { i.focus(); i.select(); }, 50);
+    const ok = () => { m._value = i.value.trim() || null; closeModal(m); };
+    $('[data-ok]', m).onclick = ok; $('[data-x]', m).onclick = () => closeModal(m);
+    i.onkeydown = e => { if (e.key === 'Enter') ok(); };
+  });
+}
+function popMenu(anchor, items) {
+  closePop();
+  const r = anchor.getBoundingClientRect();
+  const p = document.createElement('div'); p.className = 'popmenu glass';
+  p.innerHTML = items.map((it, i) => it === '-' ? '<hr>' : it.label ? `<div class="pm-label">${it.label}</div>` : `<button data-i="${i}" class="${it.cls || ''} ${it.on ? 'on' : ''}">${it.t}</button>`).join('');
+  document.body.append(p);
+  const pw = p.offsetWidth, ph = p.offsetHeight;
+  let x = Math.min(r.left, innerWidth - pw - 8), y = r.bottom + 6; if (y + ph > innerHeight - 8) y = r.top - ph - 6;
+  p.style.left = Math.max(8, x) + 'px'; p.style.top = Math.max(8, y) + 'px';
+  p.onclick = ev => { const b = ev.target.closest('button[data-i]'); if (!b) return; const it = items[+b.dataset.i]; closePop(); it.fn?.(); };
+  const outside = ev => { if (!p.contains(ev.target)) closePop(); };
+  setTimeout(() => document.addEventListener('pointerdown', outside), 0);
+  S.pop = { el: p, off: () => document.removeEventListener('pointerdown', outside) };
+}
+function closePop() { if (S.pop) { S.pop.el.remove(); S.pop.off(); S.pop = null; } }
+
+/* ================= 缩略图懒加载 ================= */
+const io = new IntersectionObserver(ents => {
+  for (const en of ents) if (en.isIntersecting) {
+    const img = en.target; io.unobserve(img);
+    blobURL(img.dataset.blob).then(u => { if (u) { img.src = u; img.onload = () => img.classList.add('ld'); } else img.classList.add('miss'); });
+  }
+}, { rootMargin: '500px' });
+function observeThumbs(root = document) { $$('img[data-blob]:not([src])', root).forEach(i => io.observe(i)); }
+
+/* ================= 主渲染 ================= */
+function applyTheme() { const t = SET.theme; if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t; }
+function render() {
+  closePop();
+  sessionStorage.setItem('huapu.view', S.view);
+  renderNav();
+  const main = $('#main');
+  ({ home: renderHome, library: renderLibrary, vibes: renderVibes, artists: renderArtists, dups: renderDups, settings: renderSettings }[S.view] || renderHome)(main);
+  renderBulk(); renderSyncBadge(); observeThumbs();
+}
+function renderNav() {
+  const h = VIEWS.map(([k, t, i]) => `<button class="${S.view === k ? 'on' : ''}" data-act="view" data-v="${k}">${ic(i, 17)}<span>${t}</span></button>`).join('');
+  $('#tabs').innerHTML = h; $('#bnav').innerHTML = h;
+}
+function renderSyncBadge() {
+  const b = $('#syncBadge'); if (!b) return;
+  if (!GH.ok()) { b.hidden = true; return; }
+  b.hidden = false;
+  b.className = 'sync-badge ' + (S.syncing ? 'busy' : S.dirty ? 'dirty' : 'ok');
+  b.innerHTML = `${ic(S.syncing ? 'sync' : 'cloud', 15)}<span>${S.syncing ? S.syncMsg : S.dirty ? '有改动' : S.lastSync ? '已同步 ' + fmtTime(S.lastSync) : '未同步'}</span>`;
+}
+function emptyState(t, sub = '') { return `<div class="empty glass"><b>${t}</b>${sub ? `<p>${sub}</p>` : ''}</div>`; }
+
+/* ================= 首页：扑克牌 ================= */
+const fanW = () => Math.round(clamp(innerWidth * 0.4, 168, 270));
+const coverOf = r => r.items.find(e => e.thumbId);
+function renderHome(main) {
+  const rows = buildRows(S.entries); S.homeRows = rows; S.rowMap = Object.fromEntries(rows.map(r => [r.id, r]));
+  if (!S.entries.length) {
+    main.innerHTML = `<div class="home"><div class="hero"><h1>画谱</h1><p>把画师串、图和 vibe 收进同一个地方</p></div>
+    <div class="welcome glass"><p>从这里开始</p><div class="wel-btns">
+      <button class="wbtn" data-act="add-img">${ic('image', 22)}<b>添加图片</b><span>原图自动读参数，截图可让 AI 识别</span></button>
+      <button class="wbtn" data-act="add-text">${ic('text', 22)}<b>添加文字串</b><span>粘贴提示词，可直接生图</span></button>
+      <button class="wbtn" data-act="add-vibe">${ic('vibe', 22)}<b>上传 vibe</b><span>.naiv4vibe 或图片</span></button>
+      <button class="wbtn" data-act="view" data-v="settings">${ic('gear', 22)}<b>设置</b><span>API、GitHub 同步、导入备份</span></button>
+    </div></div></div>`;
+    return;
+  }
+  S.homeFocus = clamp(Math.round(S.homeFocus), 0, rows.length - 1);
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+  const has = new Set(rows.map(r => (r.sort[0] || '').toUpperCase()));
+  main.innerHTML = `<div class="home">
+    <div class="hero"><h1>画谱</h1><p>${rows.length} 组画师 · ${S.entries.length} 条串 · ${S.vibes.length} 个 vibe</p>
+      <div class="search hero-search glass">${ic('search')}<input id="homeSearch" placeholder="输入画师名，牌会转过去" autocomplete="off"></div></div>
+    <div class="fan" id="fan" style="--fw:${fanW()}px">${rows.map((r, i) => fanCard(r, i)).join('')}</div>
+    <div class="fan-ctrl"><button class="btn icon-btn" data-act="fan-step" data-d="-1" aria-label="上一张">${ic('chev')}</button><span id="fanPos"></span><button class="btn icon-btn" data-act="fan-step" data-d="1" aria-label="下一张">${ic('chev')}</button></div>
+    <div class="az glass">${letters.map(l => `<button data-act="az" data-l="${l}" ${has.has(l) ? '' : 'disabled'}>${l}</button>`).join('')}<button data-act="az" data-l="#">#</button></div>
+    <p class="hint">拖动或滚轮翻牌 · 点中间那张弹出 · 进去后点第一张推开整行</p>
+  </div>`;
+  bindFan(); updateFan();
+}
+function fanCard(r, i) {
+  const c = coverOf(r);
+  return `<div class="fcard" data-i="${i}">${c ? `<img data-blob="${c.thumbId}" alt="" draggable="false">` : `<div class="noimg-f"><span>${esc(r.names[0] || '无画师')}</span></div>`}
+  <div class="lab"><b>${esc(r.names.join(' · ') || '无画师')}</b><span>${r.items.length}</span></div></div>`;
+}
+let fanRAF = 0;
+function updateFan() {
+  const f = S.homeFocus;
+  $$('#fan .fcard').forEach(c => {
+    const i = +c.dataset.i, d = i - f, ad = Math.abs(d);
+    if (ad > 7.5) { c.style.display = 'none'; return; }
+    c.style.display = '';
+    c.style.transform = `rotate(${d * 7.5}deg) translateY(${ad < 1 ? (1 - ad) * -22 : 0}px) scale(${1 - Math.min(ad, 6) * 0.03})`;
+    c.style.zIndex = String(1000 - Math.round(ad * 10));
+    c.style.opacity = String(ad > 6.5 ? Math.max(0, 7.5 - ad) : 1);
+    c.classList.toggle('center', ad < 0.5);
+  });
+  const p = $('#fanPos'); if (p) p.textContent = `${Math.round(f) + 1} / ${S.homeRows.length}`;
+  observeThumbs($('#fan') || document);
+}
+function fanTo(target) {
+  cancelAnimationFrame(fanRAF);
+  target = clamp(target, 0, S.homeRows.length - 1);
+  const from = S.homeFocus, t0 = performance.now(), dur = clamp(Math.abs(target - from) * 70 + 220, 220, 700);
+  const tick = t => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); S.homeFocus = from + (target - from) * e; updateFan(); if (k < 1) fanRAF = requestAnimationFrame(tick); };
+  fanRAF = requestAnimationFrame(tick);
+}
+function bindFan() {
+  const fan = $('#fan'); if (!fan) return;
+  const step = () => fanW() * 0.34;
+  let down = false, moved = false, sx = 0, sf = 0, lx = 0, lt = 0, vel = 0;
+  fan.addEventListener('pointerdown', ev => { down = true; moved = false; sx = lx = ev.clientX; sf = S.homeFocus; lt = performance.now(); vel = 0; cancelAnimationFrame(fanRAF); fan.setPointerCapture(ev.pointerId); });
+  fan.addEventListener('pointermove', ev => {
+    if (!down) return; const dx = ev.clientX - sx;
+    if (Math.abs(dx) > 6) moved = true; if (!moved) return;
+    const t = performance.now(); vel = (ev.clientX - lx) / Math.max(1, t - lt); lx = ev.clientX; lt = t;
+    S.homeFocus = clamp(sf - dx / step(), -0.4, S.homeRows.length - 0.6); updateFan();
+  });
+  fan.addEventListener('pointerup', ev => {
+    if (!down) return; down = false;
+    if (!moved) {
+      const c = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.fcard');
+      if (c) { const i = +c.dataset.i; if (i === Math.round(S.homeFocus)) openPop(i); else fanTo(i); }
+      return;
+    }
+    fanTo(Math.round(S.homeFocus - vel * 140 / step()));
+  });
+  fan.addEventListener('pointercancel', () => { down = false; fanTo(Math.round(S.homeFocus)); });
+  fan.addEventListener('wheel', ev => {
+    ev.preventDefault(); cancelAnimationFrame(fanRAF);
+    const d = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) ? ev.deltaX : ev.deltaY;
+    S.homeFocus = clamp(S.homeFocus + d / 150, 0, S.homeRows.length - 1); updateFan();
+    clearTimeout(fan._wt); fan._wt = setTimeout(() => fanTo(Math.round(S.homeFocus)), 140);
+  }, { passive: false });
+}
+function openPop(i) {
+  const r = S.homeRows[i]; if (!r) return; const c = coverOf(r);
+  const m = openModal(`<div class="pop-card">${c ? `<img data-blob="${c.thumbId}" alt="">` : `<div class="noimg-f"><span>${esc(r.names[0] || '无画师')}</span></div>`}</div>
+   <div class="pop-info">
+    <div class="row-names big">${r.names.length ? r.names.map(n => `<span class="rn">${esc(n)}</span>`).join('<i class="dot"></i>') : '<span class="muted">没有识别到画师</span>'}</div>
+    <p class="muted">${r.items.length} 条串${r.items.some(e => e.vibes?.length) ? ' · 含 vibe' : ''}${r.items.some(e => e.star) ? ' · 有星标' : ''}</p>
+    <div class="pop-strip">${r.items.map(e => `<button class="ps" data-act="pop-go" data-rid="${r.id}" data-id="${e.id}" title="跳到这一张">${e.thumbId ? `<img data-blob="${e.thumbId}" alt="">` : `<span>${ic('text')}</span>`}</button>`).join('')}</div>
+    <div class="m-actions"><button class="btn" data-act="close">关闭</button><button class="btn pri" data-act="pop-go" data-rid="${r.id}">进入这一行 ${ic('chev')}</button></div>
+   </div>`, { cls: 'pop', wide: true });
+  observeThumbs(m);
+}
+async function jumpToRow(rid, eid) {
+  const r = S.rowMap[rid]; if (!r) return;
+  S.view = 'library';
+  Object.assign(S.filters, { q: '', model: '', vibe: 'any', star: false, folder: '', recipe: false, artist: '' });
+  if (r.items.length > 1) { S.expanded.add(r.key); S.animRow = r.key; }
+  if (eid) S.openPrompts.add(eid);
+  render(); window.scrollTo({ top: 0 });
+  await sleep(40);
+  const el = $(`.row[data-row="${rid}"]`); if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.classList.add('flash'); setTimeout(() => el.classList.remove('flash'), 1800);
+  if (eid) setTimeout(() => { const c = $(`.card[data-id="${eid}"]`, el), tr = $('.track', el); if (c && tr) tr.scrollTo({ left: c.offsetLeft - 20, behavior: 'smooth' }); }, 450);
+}
+function jumpToEntry(eid) {
+  const rows = buildRows(S.entries); S.rowMap = Object.fromEntries(rows.map(r => [r.id, r]));
+  const r = rows.find(r => r.items.some(e => e.id === eid)); if (r) jumpToRow(r.id, eid);
+}
+
+/* ================= 画师串 ================= */
+function filteredEntries() {
+  const f = S.filters, q = normTag(f.q || '');
+  return S.entries.filter(e => {
+    if (f.recipe && !e.vibes?.length) return false;
+    if (f.star && !e.star) return false;
+    if (f.vibe === 'yes' && !e.vibes?.length) return false;
+    if (f.vibe === 'no' && e.vibes?.length) return false;
+    if (f.model && entryModel(e) !== f.model) return false;
+    if (f.folder === '__none' && e.folderId) return false;
+    if (f.folder && f.folder !== '__none' && e.folderId !== f.folder) return false;
+    if (f.artist && !artistsOf(e).some(a => a.n === f.artist)) return false;
+    if (q) { const hay = artistsOf(e).map(a => a.n).join(' ') + ' ' + normTag(e.prompt || '') + ' ' + (e.note || '').toLowerCase(); if (!hay.includes(q)) return false; }
+    return true;
+  });
+}
+function renderLibrary(main) {
+  const f = S.filters;
+  const models = [...new Set(S.entries.map(entryModel).filter(Boolean))].sort();
+  const pend = pendingTags().length;
+  main.innerHTML = `<div class="lib-head">
+    <div class="toolbar glass">
+      <div class="search">${ic('search')}<input data-filter="q" value="${esc(f.q)}" placeholder="搜画师、提示词、备注" autocomplete="off"></div>
+      <select data-filter="model"><option value="">全部模型</option>${models.map(m => `<option ${f.model === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select>
+      <select data-filter="vibe"><option value="any">vibe 不限</option><option value="yes" ${f.vibe === 'yes' ? 'selected' : ''}>用了 vibe</option><option value="no" ${f.vibe === 'no' ? 'selected' : ''}>没用 vibe</option></select>
+      <button class="btn tgl ${f.star ? 'on' : ''}" data-act="f-star">${ic('star', 15)}喜欢</button>
+      <button class="btn tgl ${f.recipe ? 'on' : ''}" data-act="f-recipe" title="只显示用了 vibe 的串，不分组">${ic('vibe', 15)}配方视图</button>
+      <label class="slider" title="缩略图大小">${ic('image', 15)}<input type="range" min="140" max="380" value="${SET.thumb}" data-act-input="thumb"></label>
+      ${f.recipe ? '' : `<button class="btn" data-act="expand-all">全部推开</button><button class="btn" data-act="collapse-all">全部收起</button>`}
+      <button class="btn tgl ${S.selectMode ? 'on' : ''}" data-act="select-mode">${ic('check', 15)}多选</button>
+    </div>
+    ${f.artist ? `<div class="filter-note">只看画师 <b>${esc(f.artist)}</b><button class="btn sm" data-act="clear-artist">${ic('x', 13)}清除</button></div>` : ''}
+    ${pend ? `<div class="notice glass">${ic('wand', 15)}<span>有 ${pend} 个词还没分类，没分类的词不会被当成画师。</span>${aiReady() ? `<button class="btn sm pri" data-act="classify">让 AI 分类</button>` : `<button class="btn sm" data-act="view" data-v="settings">去填文字 API</button>`}</div>` : ''}
+    <div class="folders">${folderBar()}</div>
+  </div>
+  <div class="rows" style="--tw:${SET.thumb}px">${listHTML()}</div>`;
+}
+function listHTML() {
+  const list = filteredEntries();
+  if (S.filters.recipe) return recipeHTML(list);
+  const rows = buildRows(list); S.rowMap = Object.fromEntries(rows.map(r => [r.id, r]));
+  if (!rows.length) return S.entries.length ? emptyState('没有符合筛选的串') : emptyState('还没有画师串', '用右上角的按钮添加图片或文字串');
+  const html = `<div class="rows-meta muted">${rows.length} 组 · ${list.length} 条</div>` + rows.map(r => rowHTML(r)).join('');
+  S.animRow = null; return html;
+}
+function refreshList() {
+  const box = $('.rows'); if (!box) return render();
+  box.innerHTML = listHTML(); const fb = $('.folders'); if (fb) fb.innerHTML = folderBar();
+  observeThumbs(box); renderBulk();
+}
+function rowHTML(r) {
+  const open = r.items.length > 1 && S.expanded.has(r.key);
+  return `<section class="row glass ${open ? 'open' : ''} ${S.animRow === r.key ? 'anim' : ''}" data-row="${r.id}">
+    <header class="row-h">
+      <div class="row-names">${r.names.length ? r.names.map(x => `<span class="rn">${esc(x)}</span>`).join('<i class="dot"></i>') : '<span class="muted">没有识别到画师</span>'}</div>
+      <span class="count">${r.items.length} 条</span>
+      ${r.items.length > 1 ? `<button class="btn sm ghost rowtgl" data-act="row" data-rid="${r.id}">${open ? '收起' : '推开'}${ic('chev', 14)}</button>` : ''}
+    </header>
+    <div class="track">${cardHTML(r.base, { r, isBase: true, rowOpen: open })}<div class="rest">${open ? r.rest.map((e, i) => cardHTML(e, { r, base: r.base, i })).join('') : ''}</div></div>
+  </section>`;
+}
+function aspectOf(e) { const w = e.dims?.w || e.params?.width, h = e.dims?.h || e.params?.height; return w && h ? `${w}/${h}` : '2/3'; }
+function cardHTML(e, { r = null, base = null, isBase = false, rowOpen = false, i = 0, recipe = false } = {}) {
+  const d = base ? diffEntry(e, base) : null;
+  const po = S.openPrompts.has(e.id), sel = S.selected.has(e.id);
+  const multi = r && r.items.length > 1;
+  const stacked = isBase && multi && !rowOpen;
+  const imgAct = S.selectMode ? 'sel' : recipe ? 'lightbox' : (isBase && multi) ? 'row' : 'prompt';
+  return `<article class="card ${po ? 'open' : ''} ${stacked ? 'stacked' : ''} ${sel ? 'sel' : ''}" data-id="${e.id}" style="--ar:${aspectOf(e)};--i:${i}">
+    <div class="img" data-act="${imgAct}" data-id="${e.id}" data-rid="${r?.id || ''}">
+      ${e.thumbId ? `<img data-blob="${e.thumbId}" alt="" draggable="false">` : `<div class="noimg"><span class="muted">${ic('image', 24)}</span><div class="noimg-b"><button class="btn sm" data-act="uploadimg" data-id="${e.id}">上传图</button><button class="btn sm" data-act="genfor" data-id="${e.id}">${ic('wand', 13)}生图</button></div></div>`}
+      <div class="ov-top">${isBase && r ? '<span class="tag-base">基准</span>' : ''}${d?.seed ? '<span class="tag-y">seed</span>' : ''}${d?.vibe ? '<span class="tag-y">vibe</span>' : ''}<span class="sp"></span><button class="star ${e.star ? 'on' : ''}" data-act="star" data-id="${e.id}" aria-label="星标">${ic('star', 15)}</button></div>
+      ${stacked ? `<div class="stack-n"><b>+${r.items.length - 1}</b><small>点图推开</small></div>` : ''}
+      ${e.thumbId && !recipe ? `<button class="lb-btn" data-act="lightbox" data-id="${e.id}" data-rid="${r?.id || ''}" aria-label="看大图">${ic('expand', 14)}</button>` : ''}
+      ${S.selectMode ? `<span class="selbox">${sel ? ic('check', 14) : ''}</span>` : ''}
+    </div>
+    <div class="body">
+      <div class="chips">${chipsHTML(e, d, isBase || recipe || !base)}</div>
+      ${d && d.removed.length ? `<div class="removed">${d.removed.map(t => `<s>${esc(t.n)}${t.w !== 1 ? ' ' + t.w : ''}</s>`).join('')}</div>` : ''}
+      ${vtagsHTML(e, d)}
+      <div class="card-foot"><span class="muted">${esc(entryModel(e) || SRC[e.source] || '')}${e.note ? ' · ' + ic('edit', 11) : ''}</span><button class="btn xs ghost" data-act="prompt" data-id="${e.id}">${po ? '收起' : '提示词'}</button></div>
+      ${po ? xpHTML(e, isBase, r) : ''}
+    </div>
+  </article>`;
+}
+function chipsHTML(e, d, mono) {
+  const toks = d ? d.marks : compTokens(e).map(t => ({ ...t, st: 'same' }));
+  if (!toks.length) return `<span class="muted sm">${e.prompt ? '还没认出画师' : '空串'}</span>`;
+  return toks.map(t => {
+    const hl = !mono && t.st !== 'same';
+    const w = t.st === 'w' && !mono ? `<i>${t.bw}→${t.w}</i>` : t.w !== 1 ? `<i>${t.w}</i>` : '';
+    return `<span class="chip ${t.c} ${hl ? 'hl' : 'mono'}" data-act="tokmenu" data-n="${esc(t.n)}">${esc(t.n)}${w}</span>`;
+  }).join('');
+}
+function vtagsHTML(e, d) {
+  if (!e.vibes?.length) return '';
+  return `<div class="vtags ${d?.vibe ? 'hl' : ''}">${e.vibes.map((v, i) => {
+    const vb = v.vibeId && S.vibes.find(x => x.id === v.vibeId);
+    return vb ? `<span class="vtag solid" data-act="govibe" data-vid="${vb.id}" title="${esc(vb.name)}">${vb.previewId ? `<img data-blob="${vb.previewId}" alt="">` : '<span class="sq f"></span>'}<b>${esc(vb.name)}</b><i>${v.strength ?? ''}</i></span>`
+      : `<span class="vtag hollow" data-act="linkvibe" data-id="${e.id}" data-slot="${i}" title="库里没有这个 vibe，点击关联"><span class="sq"></span>${v.strength ?? '?'}</span>`;
+  }).join('')}</div>`;
+}
+function chipTok(t) { const c = catOf(t); return `<span class="chip cat cat-${c}" data-act="tokmenu" data-n="${esc(t.n)}">${esc(t.n)}${t.w !== 1 ? `<i>${t.w}</i>` : ''}</span>`; }
+function xpHTML(e, isBase, r) {
+  const toks = e.tokens || [];
+  const gen = toks.filter(t => catOf(t) === 'general');
+  const p = e.params || {};
+  const meta = [['模型', entryModel(e)], ['Seed', p.seed], ['Steps', p.steps], ['Scale', p.scale], ['Sampler', p.sampler], ['尺寸', (e.dims?.w || p.width) ? `${e.dims?.w || p.width}×${e.dims?.h || p.height}` : ''], ['来源', SRC[e.source]], ['入库', fmtTime(e.createdAt)]].filter(x => x[1] != null && x[1] !== '');
+  return `<div class="xp">
+    <div class="xp-sec"><div class="xp-l">正面<button class="btn xs ghost" data-act="copy" data-id="${e.id}" data-f="prompt">${ic('copy', 12)}复制</button></div><p class="ptxt">${esc(e.prompt) || '<span class="muted">（空）</span>'}</p></div>
+    ${e.chars?.length ? `<div class="xp-sec"><div class="xp-l">角色</div>${e.chars.map(c => `<p class="ptxt">${esc(c)}</p>`).join('')}</div>` : ''}
+    <div class="xp-sec"><div class="xp-l">负面<button class="btn xs ghost" data-act="copy" data-id="${e.id}" data-f="negative">${ic('copy', 12)}复制</button></div><p class="ptxt neg">${esc(e.negative) || '—'}</p></div>
+    <div class="meta-grid">${meta.map(([k, v]) => `<span>${k}</span><b>${esc(v)}</b>`).join('')}</div>
+    ${gen.length ? `<div class="xp-sec"><div class="xp-l">通用词<button class="btn xs ghost" data-act="copy" data-id="${e.id}" data-f="general">${ic('copy', 12)}复制</button></div><div class="chips">${gen.map(t => `<span class="chip general mono" data-act="tokmenu" data-n="${esc(t.n)}">${esc(t.raw)}</span>`).join('')}</div></div>` : ''}
+    ${toks.length ? `<div class="xp-sec"><div class="xp-l">全部分词<span class="muted sm">点词改类别，全库生效</span></div><div class="chips">${toks.map(chipTok).join('')}</div></div>` : ''}
+    ${e.note ? `<div class="note">${esc(e.note)}</div>` : ''}
+    <div class="xp-act">
+      <button class="btn xs" data-act="edit" data-id="${e.id}">${ic('edit', 12)}编辑</button>
+      ${!isBase && r ? `<button class="btn xs" data-act="setbase" data-id="${e.id}" data-rid="${r.id}">设为基准</button>` : ''}
+      <button class="btn xs" data-act="genfor" data-id="${e.id}">${ic('wand', 12)}生图</button>
+      <button class="btn xs" data-act="move" data-id="${e.id}">${ic('folder', 12)}移动</button>
+      <button class="btn xs danger" data-act="del" data-id="${e.id}">${ic('trash', 12)}删除</button>
+    </div>
+  </div>`;
+}
+function recipeHTML(list) {
+  if (!list.length) return emptyState('还没有用了 vibe 的串');
+  return `<div class="rows-meta muted">${list.length} 条用了 vibe · 点图看大图</div><div class="recipe">${[...list].sort((a, b) => b.createdAt - a.createdAt).map(e => cardHTML(e, { recipe: true })).join('')}</div>`;
+}
+function folderBar() {
+  const f = S.filters.folder;
+  const cnt = id => S.entries.filter(e => id === '__none' ? !e.folderId : e.folderId === id).length;
+  return `<button class="fchip ${!f ? 'on' : ''}" data-act="folder" data-fid="">全部<i>${S.entries.length}</i></button>
+  <button class="fchip ${f === '__none' ? 'on' : ''}" data-act="folder" data-fid="__none">未归档<i>${cnt('__none')}</i></button>
+  ${[...S.folders].sort((a, b) => a.name.localeCompare(b.name)).map(x => `<span class="fchip ${f === x.id ? 'on' : ''}" data-act="folder" data-fid="${x.id}">${ic('folder', 13)}${esc(x.name)}<i>${cnt(x.id)}</i><button class="fmenu" data-act="foldermenu" data-fid="${x.id}" aria-label="文件夹操作">⋯</button></span>`).join('')}
+  <button class="fchip add" data-act="newfolder">${ic('plus', 13)}新建文件夹</button>`;
+}
+function renderBulk() {
+  const b = $('#bulk'); if (!b) return;
+  if (!S.selectMode || S.view !== 'library') { b.classList.remove('show'); return; }
+  b.classList.add('show');
+  b.innerHTML = `<span>已选 <b>${S.selected.size}</b></span>
+   <button class="btn sm" data-act="sel-all">全选当前</button>
+   <button class="btn sm" data-act="bulk-move">${ic('folder', 13)}移动</button>
+   <button class="btn sm" data-act="bulk-star">${ic('star', 13)}星标</button>
+   <button class="btn sm" data-act="bulk-unstar">取消星标</button>
+   <button class="btn sm danger" data-act="bulk-del">${ic('trash', 13)}删除</button>
+   <button class="btn sm pri" data-act="select-mode">完成</button>`;
+}
+function refreshCardRow(eid) {
+  const card = $(`.card[data-id="${eid}"]`); const row = card?.closest('.row');
+  const r = row && S.rowMap[row.dataset.row];
+  if (!r) return refreshList();
+  const sl = $('.track', row).scrollLeft;
+  row.outerHTML = rowHTML(r);
+  const nr = $(`.row[data-row="${r.id}"]`); $('.track', nr).scrollLeft = sl; observeThumbs(nr);
+}
+
+/* ================= Vibe ================= */
+function vibeModelOpts() { return [...new Set(['V4', 'V4.5', 'V5', ...SET.models.map(m => m.label).filter(l => !/curated|V3/i.test(l))])]; }
+function renderVibes(main) {
+  const usage = {}; for (const e of S.entries) for (const v of e.vibes || []) if (v.vibeId) (usage[v.vibeId] ||= []).push(e);
+  const hollow = S.entries.filter(e => e.vibes?.some(v => !v.vibeId || !S.vibes.find(x => x.id === v.vibeId)));
+  main.innerHTML = `<div class="page-h"><div><h2>Vibe</h2><p class="muted">只放你自己上传的 vibe。图片里只记录用没用、强度多少，不解析内容。</p></div><button class="btn pri" data-act="add-vibe">${ic('plus')}上传 vibe</button></div>
+  <div class="vgrid">${S.vibes.length ? [...S.vibes].sort((a, b) => b.createdAt - a.createdAt).map(v => vibeCard(v, usage[v.id] || [])).join('') : emptyState('还没有 vibe', '可以上传 .naiv4vibe 文件（带编码，能直接用来生图）或图片')}</div>
+  ${hollow.length ? `<div class="page-h sub"><div><h3>库里没有的 vibe <span class="muted">${hollow.length} 张图</span></h3><p class="muted">这些图用了 vibe，但没关联到库里的 vibe。勾选后关联，空心方块会变实心。</p></div></div>
+  <div class="hollow glass"><div class="hgrid">${hollow.map(e => `<button class="hitem ${S.hsel.has(e.id) ? 'on' : ''}" data-act="hsel" data-id="${e.id}">${e.thumbId ? `<img data-blob="${e.thumbId}" alt="">` : `<span>${ic('text')}</span>`}<i>${e.vibes.filter(v => !v.vibeId).map(v => v.strength).join(' / ')}</i></button>`).join('')}</div>
+  <div class="hbar">${S.vibes.length ? `<select id="hvibe">${S.vibes.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join('')}</select><button class="btn pri" data-act="hlink">把选中的 ${S.hsel.size || ''} 张关联过去</button>` : '<span class="muted">先上传一个 vibe 才能关联</span>'}</div></div>` : ''}`;
+}
+function vibeCard(v, used) {
+  return `<div class="vcard glass" data-vid="${v.id}">
+    <div class="vprev">${v.previewId ? `<img data-blob="${v.previewId}" alt="">` : `<span class="muted">${ic('vibe', 34)}</span>`}<button class="btn xs vrep" data-act="vibe-img" data-vid="${v.id}">换预览</button>${v.fileId ? '<span class="venc">有编码</span>' : ''}</div>
+    <div class="vbody">
+      <input class="vname" value="${esc(v.name)}" data-vchg="name" data-vid="${v.id}" aria-label="名字">
+      <textarea rows="2" placeholder="备注" data-vchg="note" data-vid="${v.id}">${esc(v.note || '')}</textarea>
+      <div class="vmodels">${vibeModelOpts().map(m => `<button class="mchip ${v.models?.includes(m) ? 'on' : ''}" data-act="vmodel" data-vid="${v.id}" data-m="${esc(m)}">${esc(m)}</button>`).join('')}</div>
+      <div class="vuse"><b>${used.length}</b> 次使用</div>
+      ${used.length ? `<div class="vthumbs">${used.slice(0, 30).map(e => `<button data-act="jump-entry" data-id="${e.id}">${e.thumbId ? `<img data-blob="${e.thumbId}" alt="">` : ic('text')}</button>`).join('')}</div>` : ''}
+      <div class="vact"><button class="btn xs danger" data-act="vibe-del" data-vid="${v.id}">${ic('trash', 12)}删除</button></div>
+    </div></div>`;
+}
+
+/* ================= 画师索引 ================= */
+function renderArtists(main) {
+  const m = new Map();
+  for (const e of S.entries) for (const a of artistsOf(e)) m.set(a.n, (m.get(a.n) || 0) + 1);
+  const groups = new Map();
+  for (const [n, c] of [...m].sort((a, b) => a[0].localeCompare(b[0]))) { const L = /^[a-z]/i.test(n) ? n[0].toUpperCase() : '#'; if (!groups.has(L)) groups.set(L, []); groups.get(L).push([n, c]); }
+  main.innerHTML = `<div class="page-h"><div><h2>画师索引</h2><p class="muted">${m.size} 位画师 · 名字统一成小写，下划线换成空格。点名字只看这位画师的串。</p></div></div>
+  ${m.size ? [...groups].map(([L, arr]) => `<section class="aidx glass"><h3>${L}</h3><div class="chips">${arr.map(([n, c]) => `<button class="chip artist big" data-act="artist-filter" data-n="${esc(n)}">${esc(n)}<i>${c}</i></button>`).join('')}</div></section>`).join('') : emptyState('还没有认出的画师')}`;
+}
+
+/* ================= 查重 ================= */
+function renderDups(main) {
+  const P = S.dupPairs;
+  main.innerHTML = `<div class="page-h"><div><h2>查重</h2><p class="muted">画师和权重完全一样算撞了；seed 不同会标黄，可以都留；文件完全相同的单独提示。</p></div><button class="btn pri" data-act="scan-dups">${ic('dup')}扫描整个库</button></div>
+  ${P == null ? emptyState('点右上角扫描') : P.length ? `<div class="dup-list">${P.map(([a, b, kind], i) => `<div class="dupitem glass">
+     <div class="dthumbs">${[a, b].map(e => e.thumbId ? `<img data-blob="${e.thumbId}" alt="">` : `<span>${ic('text')}</span>`).join('')}</div>
+     <div class="dinfo"><b>${esc(artistsOf(a).map(x => x.n).join(' · ') || '（无画师）')}</b>
+     ${kind === 'hash' ? '<span class="tag-y">文件完全相同</span>' : (a.params?.seed ?? null) !== (b.params?.seed ?? null) ? '<span class="tag-y">seed 不同</span>' : '<span class="muted sm">seed 相同</span>'}</div>
+     <button class="btn" data-act="dup-open" data-i="${i}">对比</button></div>`).join('')}</div>` : emptyState('没有发现重复')}`;
+}
+
+/* ================= 设置 ================= */
+function fld(path, label, ph = '', type = 'text', extra = '') { return `<label class="field"><span>${label}</span><input type="${type}" data-set="${path}" value="${esc(getPath(SET, path) ?? '')}" placeholder="${esc(ph)}" ${extra} autocomplete="off"></label>`; }
+function sel(path, label, opts) { const v = getPath(SET, path); return `<label class="field"><span>${label}</span><select data-set="${path}">${opts.map(([k, t]) => `<option value="${esc(k)}" ${v === k ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select></label>`; }
+function renderSettings(main) {
+  const t = SET.text;
+  const tph = { gemini: ['https://generativelanguage.googleapis.com（中转站就填中转地址）', 'gemini-2.5-flash'], deepseek: ['https://api.deepseek.com', 'deepseek-chat'], openai: ['https://你的中转站域名（填到域名即可）', 'gpt-4o-mini'] }[t.provider] || ['', ''];
+  main.innerHTML = `<div class="page-h"><div><h2>设置</h2><p class="muted">Key 和令牌只存在这台设备的浏览器里，不会写进 GitHub。手机上要再填一次。</p></div></div>
+  <div class="sgrid">
+   <section class="scard glass"><h3>${ic('text')}文字 API<span class="muted">分词、补抓画师、识别截图</span></h3>
+     ${sel('text.provider', '接口类型', [['openai', 'OpenAI 兼容 / 中转站'], ['gemini', 'Gemini'], ['deepseek', 'DeepSeek']])}
+     ${fld('text.base', '接口地址', tph[0])}
+     ${fld('text.key', 'Key', '', 'password')}
+     ${fld('text.model', '模型名', tph[1])}
+     ${fld('text.visionModel', '看图模型（识别截图用，留空用上面的）', t.provider === 'deepseek' ? 'DeepSeek 不能看图，截图识别请换接口' : '例如 gpt-4o / gemini-2.5-flash')}
+     <div class="srow"><button class="btn" data-act="test-text">测试连接</button></div>
+   </section>
+   <section class="scard glass"><h3>${ic('wand')}NAI 生图</h3>
+     ${sel('nai.mode', '中转站接口格式', [['nai', 'NovelAI 官方格式 /ai/generate-image'], ['openai', 'OpenAI 格式 /v1/images/generations']])}
+     ${fld('nai.base', '接口地址', '中转站地址；官方格式会拼上 /ai/generate-image')}
+     ${fld('nai.key', 'Key', '', 'password')}
+     ${sel('nai.model', '默认模型', SET.models.map(m => [m.api, `${m.label}（${m.api}）`]))}
+     <div class="f3">${sel('nai.size', '尺寸', [['832x1216', '832×1216 竖'], ['1216x832', '1216×832 横'], ['1024x1024', '1024×1024 方']])}${fld('nai.steps', 'Steps', '28', 'number')}${fld('nai.scale', 'Scale', '5', 'number', 'step="0.1"')}</div>
+     ${sel('nai.sampler', '采样器', [['k_euler_ancestral', 'Euler Ancestral'], ['k_euler', 'Euler'], ['k_dpmpp_2s_ancestral', 'DPM++ 2S Ancestral'], ['k_dpmpp_2m_sde', 'DPM++ 2M SDE'], ['k_dpmpp_2m', 'DPM++ 2M'], ['k_dpmpp_sde', 'DPM++ SDE']])}
+   </section>
+   <section class="scard glass"><h3>${ic('image')}GPT 生图</h3>
+     ${sel('gpt.mode', '中转站接口格式', [['images', 'images/generations'], ['chat', 'chat/completions（回复里带图）']])}
+     ${fld('gpt.base', '接口地址', 'https://你的中转站域名')}
+     ${fld('gpt.key', 'Key', '', 'password')}
+     ${fld('gpt.model', '模型名', 'gpt-image-1')}
+     ${sel('gpt.size', '尺寸', [['1024x1536', '1024×1536 竖'], ['1536x1024', '1536×1024 横'], ['1024x1024', '1024×1024 方']])}
+   </section>
+   <section class="scard glass"><h3>${ic('rows')}模型名映射<span class="muted">V5 出来时在这里加一行，不用改代码</span></h3>
+     <label class="field"><span>每行：匹配规则（正则，匹配图里的模型字段） | 显示名 | API 模型名。从上往下匹配。</span>
+     <textarea rows="7" class="mono-ta" data-set-models>${esc(SET.models.map(m => `${m.match} | ${m.label} | ${m.api}`).join('\n'))}</textarea></label>
+   </section>
+   <section class="scard glass"><h3>${ic('cloud')}GitHub 同步<span class="muted">手机和电脑各填一次，数据存在私有仓库</span></h3>
+     <div class="f2">${fld('gh.owner', '用户名', 'your-name')}${fld('gh.repo', '私有仓库名', 'huapu-data')}</div>
+     <div class="f2">${fld('gh.branch', '分支', 'main')}${fld('gh.dir', '仓库里的文件夹', 'huapu')}</div>
+     ${fld('gh.token', '细粒度令牌（只勾这个仓库的 Contents 读写）', 'github_pat_…', 'password')}
+     <label class="check"><input type="checkbox" data-set="gh.auto" ${SET.gh.auto ? 'checked' : ''}> 有改动时自动同步（约 20 秒后）</label>
+     <div class="srow"><button class="btn pri" data-act="sync">${ic('sync', 14)}立即同步</button><span class="muted sm">${S.lastSync ? '上次 ' + fmtTime(S.lastSync) : '还没同步过'}</span></div>
+   </section>
+   <section class="scard glass"><h3>${ic('folder')}备份与数据</h3>
+     <div class="srow wrap"><button class="btn" data-act="export-full">导出备份（含图片）</button><button class="btn" data-act="export-data">导出备份（仅数据）</button><button class="btn" data-act="import">导入备份</button></div>
+     <div class="srow wrap"><button class="btn" data-act="reparse">重新分词全部串</button><button class="btn" data-act="reset-ai">清空 AI 分类缓存</button></div>
+     ${sel('theme', '外观', [['auto', '跟随系统'], ['light', '浅色'], ['dark', '深色']])}
+     <p class="muted sm">本机共 ${S.entries.length} 条串、${S.vibes.length} 个 vibe、${Object.keys(S.tags).length} 个已分类的词。</p>
+   </section>
+  </div>`;
+}
+
+/* ================= 编辑器（添加文字串 / 编辑 / 生图） ================= */
+function entryEditor(e, { focusGen = false } = {}) {
+  const isNew = !e;
+  const d = e || { prompt: '', negative: '', params: {}, vibes: [], folderId: S.filters.folder && S.filters.folder !== '__none' ? S.filters.folder : '', note: '' };
+  const st = { vibes: structuredClone(d.vibes || []), img: null, arts: e ? artistsOf(e).map(a => ({ ...a })) : null, artsDirty: false, artsReset: false, eng: 'nai', genSeed: null };
+  const curLabel = modelLabel(d.params?.modelRaw);
+  const m = openModal(`<div class="ed-head"><h3>${isNew ? '添加文字串' : '编辑'}</h3><button class="btn icon-btn ghost" data-act="close">${ic('x')}</button></div>
+  <div class="ed-grid">
+    <div class="ed-main">
+      <label class="field"><span>正面提示词</span><textarea id="edP" rows="6" placeholder="artist:xxx, 1.2::artist:yyy::, best quality, …">${esc(d.prompt)}</textarea></label>
+      <label class="field"><span>负面提示词</span><textarea id="edN" rows="3">${esc(d.negative)}</textarea></label>
+      <div class="f4">
+        <label class="field"><span>模型</span><select id="edM"><option value="">未填</option>${SET.models.map(x => `<option value="${esc(x.api)}" ${curLabel === x.label ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select></label>
+        <label class="field"><span>Seed</span><input id="edSeed" type="number" value="${d.params?.seed ?? ''}"></label>
+        <label class="field"><span>Steps</span><input id="edSteps" type="number" value="${d.params?.steps ?? ''}"></label>
+        <label class="field"><span>Scale</span><input id="edScale" type="number" step="0.1" value="${d.params?.scale ?? ''}"></label>
+      </div>
+      <div class="field"><span>Vibe</span><div id="edV" class="vslots"></div><button class="btn xs" id="edVAdd">${ic('plus', 12)}加一个 vibe</button></div>
+      ${e ? `<div class="field"><span>画师 <em class="muted">AI 认错了在这里改，改完自动重新分组</em></span><div id="edA" class="chips"></div><div class="row-inline"><input class="inp" id="edAIn" placeholder="加画师，回车"><button class="btn xs ghost" id="edAReset">恢复自动识别</button></div></div>` : ''}
+      <div class="f2"><label class="field"><span>文件夹</span><select id="edF"><option value="">未归档</option>${S.folders.map(f => `<option value="${f.id}" ${d.folderId === f.id ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select></label>
+      <label class="field"><span>备注</span><input id="edNote" value="${esc(d.note || '')}"></label></div>
+    </div>
+    <div class="ed-side">
+      <div class="ed-img" id="edImg">${e?.thumbId ? `<img data-blob="${e.thumbId}" alt="">` : `<span class="muted">${ic('image', 28)}<br>还没有图</span>`}</div>
+      <button class="btn sm" id="edUp">${ic('image', 13)}上传图</button>
+      <div class="gen-box">
+        <div class="seg" id="edEng"><button data-e="nai" class="on">NAI</button><button data-e="gpt">GPT</button></div>
+        <select id="edSize"></select>
+        <button class="btn pri" id="edGen">${ic('wand')}生图</button>
+        <div class="muted sm" id="edGenMsg">生成的图会在保存时一起存进库里</div>
+      </div>
+    </div>
+  </div>
+  <div class="m-actions"><button class="btn" data-act="close">取消</button><button class="btn pri" id="edSave">保存</button></div>`, { wide: true, cls: 'editor' });
+  observeThumbs(m);
+
+  const vbox = $('#edV', m);
+  const drawVibes = () => {
+    vbox.innerHTML = st.vibes.map((v, i) => `<div class="vslot" data-i="${i}">
+      <select data-k="vibeId"><option value="">库里没有（只记强度）</option>${S.vibes.map(x => `<option value="${x.id}" ${v.vibeId === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>
+      <input type="number" step="0.01" data-k="strength" value="${v.strength ?? ''}" placeholder="强度">
+      <input type="number" step="0.01" data-k="info" value="${v.info ?? ''}" placeholder="信息提取">
+      <button class="btn xs ghost icon-btn" data-k="rm">${ic('x', 12)}</button></div>`).join('') || '<span class="muted sm">没用 vibe</span>';
+  };
+  vbox.addEventListener('change', ev => { const row = ev.target.closest('.vslot'); const k = ev.target.dataset.k; if (!row || !k) return; const v = st.vibes[+row.dataset.i]; v[k] = k === 'vibeId' ? (ev.target.value || null) : (ev.target.value === '' ? null : +ev.target.value); });
+  vbox.addEventListener('click', ev => { const b = ev.target.closest('[data-k="rm"]'); if (!b) return; st.vibes.splice(+b.closest('.vslot').dataset.i, 1); drawVibes(); });
+  $('#edVAdd', m).onclick = () => { st.vibes.push({ vibeId: S.vibes[0]?.id || null, strength: 0.6, info: 1, sig: null }); drawVibes(); };
+  drawVibes();
+
+  if (e) {
+    const abox = $('#edA', m);
+    const drawArts = () => { abox.innerHTML = st.arts.map((a, i) => `<span class="chip artist mono">${esc(a.n)}<input class="wt" type="number" step="0.05" value="${a.w}" data-i="${i}"><button data-rm="${i}" aria-label="删除">${ic('x', 11)}</button></span>`).join('') || '<span class="muted sm">没有画师</span>'; };
+    abox.addEventListener('click', ev => { const b = ev.target.closest('[data-rm]'); if (!b) return; st.arts.splice(+b.dataset.rm, 1); st.artsDirty = true; drawArts(); });
+    abox.addEventListener('change', ev => { const i = ev.target.dataset.i; if (i == null) return; st.arts[+i].w = +ev.target.value || 1; st.artsDirty = true; });
+    $('#edAIn', m).onkeydown = ev => { if (ev.key !== 'Enter') return; const n = normTag(ev.target.value); if (n && !st.arts.some(a => a.n === n)) { st.arts.push({ n, w: 1 }); st.artsDirty = true; drawArts(); } ev.target.value = ''; };
+    $('#edAReset', m).onclick = () => { st.artsReset = true; st.artsDirty = false; const tmp = { tokens: tokenize($('#edP', m).value) }; st.arts = artistsOf(tmp); drawArts(); toast('保存后按提示词重新识别画师'); };
+    drawArts();
+  }
+
+  const sizeSel = $('#edSize', m);
+  const drawSizes = () => {
+    const opts = st.eng === 'nai' ? [['832x1216', '832×1216 竖'], ['1216x832', '1216×832 横'], ['1024x1024', '1024×1024 方']] : [['1024x1536', '1024×1536 竖'], ['1536x1024', '1536×1024 横'], ['1024x1024', '1024×1024 方']];
+    const def = st.eng === 'nai' ? SET.nai.size : SET.gpt.size;
+    sizeSel.innerHTML = opts.map(([k, t]) => `<option value="${k}" ${k === def ? 'selected' : ''}>${t}</option>`).join('');
+  };
+  $('#edEng', m).onclick = ev => { const b = ev.target.closest('[data-e]'); if (!b) return; st.eng = b.dataset.e; $$('#edEng button', m).forEach(x => x.classList.toggle('on', x === b)); drawSizes(); };
+  drawSizes();
+
+  const showImg = blob => { const u = URL.createObjectURL(blob); $('#edImg', m).innerHTML = `<img src="${u}" class="ld" alt="">`; };
+  $('#edUp', m).onclick = () => pickFile('image/*', false, async fs => { if (!fs[0]) return; st.img = { blob: fs[0], source: null }; showImg(fs[0]); });
+  const num = id => { const v = $(id, m).value; return v === '' ? null : +v; };
+
+  $('#edGen', m).onclick = async () => {
+    const prompt = $('#edP', m).value.trim(); if (!prompt) return toast('先写提示词');
+    const btn = $('#edGen', m), msg = $('#edGenMsg', m);
+    btn.disabled = true; btn.classList.add('loading'); msg.textContent = '生成中，通常要十几秒…';
+    try {
+      let blob, seed = null;
+      if (st.eng === 'gpt') blob = await genGPT({ prompt, size: sizeSel.value });
+      else {
+        const api = $('#edM', m).value || SET.nai.model;
+        const vibes = [];
+        for (const v of st.vibes) { const vb = S.vibes.find(x => x.id === v.vibeId); const enc = await getVibeEncoding(vb, api); if (enc) vibes.push({ enc, strength: v.strength, info: v.info }); else if (vb) toast(`vibe「${esc(vb.name)}」没有这个模型的编码，这次没带上`); }
+        const r = await genNAI({ prompt, negative: $('#edN', m).value.trim(), model: api, size: sizeSel.value, seed: num('#edSeed'), steps: num('#edSteps'), scale: num('#edScale'), vibes });
+        blob = r.blob; seed = r.seed;
+      }
+      st.img = { blob, source: 'gen' }; st.genSeed = seed; showImg(blob);
+      if (seed != null && !$('#edSeed', m).value) $('#edSeed', m).value = seed;
+      msg.textContent = '好了，点保存就会存进库里';
+    } catch (err) { msg.textContent = '失败：' + err.message; }
+    finally { btn.disabled = false; btn.classList.remove('loading'); }
+  };
+  if (focusGen) setTimeout(() => $('#edGen', m).scrollIntoView({ block: 'nearest' }), 100);
+
+  $('#edSave', m).onclick = async () => {
+    const prompt = $('#edP', m).value.trim();
+    if (!prompt && !st.img && !e?.thumbId) return toast('提示词是空的');
+    const ent = e || { id: uid(), createdAt: now(), source: 'text', star: false, tokens: [], params: {}, vibes: [] };
+    const beforeKey = e ? groupKey(e) : null;
+    const promptChanged = ent.prompt !== prompt;
+    ent.prompt = prompt; ent.negative = $('#edN', m).value.trim();
+    const mv = $('#edM', m).value;
+    const keepRaw = ent.params?.modelRaw && !SET.models.some(x => x.label === modelLabel(ent.params.modelRaw));
+    ent.params = { ...ent.params, modelRaw: mv || (keepRaw ? ent.params.modelRaw : ''), seed: num('#edSeed'), steps: num('#edSteps'), scale: num('#edScale') };
+    ent.vibes = st.vibes.filter(v => v.vibeId || v.strength != null).map(v => ({ sig: v.sig || null, strength: v.strength, info: v.info, vibeId: v.vibeId || null }));
+    for (const v of ent.vibes) if (v.vibeId && v.sig) { const vb = S.vibes.find(x => x.id === v.vibeId); if (vb && !vb.sigs?.includes(v.sig)) { (vb.sigs ||= []).push(v.sig); await putVibe(vb); } }
+    if (promptChanged || !ent.tokens?.length) ent.tokens = tokenize(prompt);
+    if (st.artsReset) ent.artistOverride = null;
+    if (st.artsDirty) ent.artistOverride = st.arts;
+    ent.folderId = $('#edF', m).value; ent.note = $('#edNote', m).value.trim();
+    if (st.img) { await attachImage(ent, st.img.blob); if (st.img.source === 'gen' && isNew) ent.source = 'gen'; }
+    await putEntry(ent);
+    closeModal(m);
+    await classifyPending(true);
+    const k = groupKey(ent);
+    const isNewRow = S.entries.filter(x => groupKey(x) === k).length === 1;
+    toast(isNewRow && k !== '__none__' ? '已保存 · 这是新的画师组，首页扑克牌里已经加上了' : beforeKey && beforeKey !== k ? '已保存 · 画师变了，已移到对应的行' : '已保存');
+    render();
+    if (isNew || promptChanged || st.artsDirty) await checkDups([ent]);
+  };
+}
+function pickFile(accept, multiple, cb) {
+  const i = document.createElement('input'); i.type = 'file'; i.accept = accept; i.multiple = multiple;
+  i.onchange = () => cb([...i.files]); i.click();
+}
+async function attachImage(ent, blob) {
+  const buf = await blob.arrayBuffer();
+  const th = await makeThumb(blob);
+  const old = [ent.origId, ent.thumbId];
+  ent.origId = uid(); ent.thumbId = uid();
+  await putBlob(ent.origId, blob, 'orig'); await putBlob(ent.thumbId, th.blob, 'thumb');
+  ent.fileHash = await sha256(buf); ent.dims = { w: th.w, h: th.h };
+  for (const b of old) if (b) { urlCache.delete(b); if (!blobRefd(b)) await DB.del('blobs', b); }
+}
+
+/* ================= 导入图片 ================= */
+async function ingestFile(file) {
+  const buf = await file.arrayBuffer();
+  const hash = await sha256(buf);
+  const ex = S.entries.find(e => e.fileHash === hash);
+  if (ex) return { dup: ex };
+  const meta = (file.type === 'image/png' || /\.png$/i.test(file.name)) ? await readMeta(buf, file) : null;
+  const th = await makeThumb(file);
+  const e = { id: uid(), createdAt: now(), source: meta ? 'png' : 'screenshot', star: false, prompt: '', negative: '', chars: [], params: {}, vibes: [], tokens: [], folderId: S.filters.folder && S.filters.folder !== '__none' ? S.filters.folder : '', note: '' };
+  e.origId = uid(); e.thumbId = uid(); e.fileHash = hash; e.dims = { w: th.w, h: th.h };
+  await putBlob(e.origId, file, 'orig'); await putBlob(e.thumbId, th.blob, 'thumb');
+  if (meta) {
+    e.prompt = meta.prompt; e.negative = meta.negative || ''; e.chars = meta.chars || []; e.params = meta.params || {};
+    e.vibes = (meta.vibes || []).map(v => ({ ...v, vibeId: v.sig ? (S.vibes.find(x => x.sigs?.includes(v.sig))?.id || null) : null }));
+    e.tokens = tokenize(e.prompt);
+  }
+  await putEntry(e);
+  return { entry: e };
+}
+async function addImages(files) {
+  files = [...files].filter(f => f.type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(f.name));
+  if (!files.length) return;
+  const added = [], noMeta = []; let skipped = 0;
+  const t = toast('', 600000);
+  for (let i = 0; i < files.length; i++) {
+    t.innerHTML = `正在导入 ${i + 1} / ${files.length}…`;
+    try { const r = await ingestFile(files[i]); if (r.dup) { skipped++; continue; } (r.entry.prompt ? added : noMeta).push(r.entry); }
+    catch (err) { console.error(err); toast(`${esc(files[i].name)} 导入失败：${esc(err.message)}`, 5000); }
+  }
+  t.remove();
+  if (skipped) toast(`${skipped} 张和库里的文件完全相同，已跳过`, 4000);
+  if (added.length) toast(`读到 ${added.length} 张图的参数`);
+  render();
+  if (noMeta.length) {
+    const ok = await ask(`有 ${noMeta.length} 张没读到参数`, aiReady() ? '看起来是截图。要用 AI 把图里的文字识别成提示词吗？识别完可以再手改。' : '看起来是截图。在设置里填好能看图的文字 API 后可以自动识别，现在先只存图。',
+      aiReady() ? [{ t: '先只存图', v: false }, { t: 'AI 识别', v: true, cls: 'pri' }] : [{ t: '知道了', v: false, cls: 'pri' }]);
+    if (ok) {
+      const t2 = toast('', 600000);
+      for (let i = 0; i < noMeta.length; i++) { t2.innerHTML = `AI 识别截图 ${i + 1} / ${noMeta.length}…`; try { await ocrEntry(noMeta[i]); added.push(noMeta[i]); } catch (err) { toast('识别失败：' + esc(err.message), 5000); } }
+      t2.remove(); render();
+    }
+  }
+  await classifyPending();
+  await checkDups(added);
+}
+async function ocrEntry(e) {
+  const blob = await getBlob(e.origId);
+  const small = await makeThumb(blob, 1800, 'image/jpeg');
+  const txt = await aiChat([{ role: 'user', content: OCR_PROMPT }], { image: { mime: 'image/jpeg', b64: await blobToB64(small.blob) } });
+  const j = parseJSONLoose(txt);
+  e.prompt = String(j.prompt || '').trim(); e.negative = String(j.negative || '').trim();
+  e.params = { seed: j.seed ?? null, steps: j.steps ?? null, scale: j.scale ?? null, sampler: j.sampler || '', width: j.width || null, height: j.height || null, modelRaw: j.model || '' };
+  e.vibes = (j.vibe_strengths || []).filter(x => x != null).map(s => ({ strength: +s, info: null, sig: null, vibeId: null }));
+  e.tokens = tokenize(e.prompt);
+  await putEntry(e);
+}
+async function checkDups(list) {
+  for (const e of list) {
+    if (!S.entries.includes(e)) continue;
+    const o = findDupFor(e); if (o) await dupModal(o, e);
+  }
+}
+function dupModal(a, b) {
+  return new Promise(res => {
+    const seedDiff = (a.params?.seed ?? null) !== (b.params?.seed ?? null);
+    const side = (e, label) => `<div class="dside"><div class="dlabel">${label} · ${fmtTime(e.createdAt)} · ${SRC[e.source] || ''}</div>
+      <div class="dimg">${e.thumbId ? `<img data-blob="${e.thumbId}" alt="">` : '<span class="muted">没有图</span>'}</div>
+      <div class="chips">${compTokens(e).map(t => `<span class="chip mono ${t.c}">${esc(t.n)}${t.w !== 1 ? `<i>${t.w}</i>` : ''}</span>`).join('')}</div>
+      <table class="ptable">${[['模型', entryModel(e)], ['Seed', e.params?.seed, seedDiff], ['Steps', e.params?.steps], ['Scale', e.params?.scale], ['Sampler', e.params?.sampler], ['Vibe', (e.vibes || []).map(v => (S.vibes.find(x => x.id === v.vibeId)?.name || '□') + ' ' + v.strength).join('，') || '无'], ['星标', e.star ? '★' : ''], ['备注', e.note]].map(([k, v, hl]) => `<tr class="${hl ? 'hl' : ''}"><td>${k}</td><td>${esc(v ?? '—') || '—'}</td></tr>`).join('')}</table>
+      <p class="ptxt sm">${esc(e.prompt)}</p></div>`;
+    const m = openModal(`<h3>这两条撞了</h3><p class="muted">画师和权重完全相同。${seedDiff ? '<span class="tag-y">seed 不同</span> 可以都留。' : ''}删掉的那条，星标、备注、vibe 关联、文件夹会合并到留下的那条。</p>
+      <div class="dgrid">${side(a, '左')}${side(b, '右')}</div>
+      <div class="m-actions"><button class="btn danger" data-k="L">删左</button><button class="btn danger" data-k="R">删右</button><button class="btn pri" data-k="K">都留</button></div>`, { wide: true });
+    m._resolve = res;
+    $$('[data-k]', m).forEach(btn => btn.onclick = async () => {
+      const k = btn.dataset.k;
+      if (k === 'K') { S.meta.keepPairs.push(pairKey(a, b)); await saveMeta(); }
+      else { const [keep, drop] = k === 'L' ? [b, a] : [a, b]; await mergeInto(keep, drop); }
+      m._value = k; closeModal(m);
+      if (S.dupPairs) S.dupPairs = scanDups();
+      render();
+    });
+  });
+}
+async function mergeInto(keep, drop) {
+  keep.star = keep.star || drop.star;
+  if (drop.note && drop.note !== keep.note) keep.note = [keep.note, drop.note].filter(Boolean).join('\n');
+  if (!keep.folderId && drop.folderId) keep.folderId = drop.folderId;
+  (drop.vibes || []).forEach((v, i) => { if (!v.vibeId) return; if (keep.vibes?.[i] && !keep.vibes[i].vibeId) keep.vibes[i].vibeId = v.vibeId; else if (!keep.vibes?.some(x => x.vibeId === v.vibeId)) (keep.vibes ||= []).push({ ...v }); });
+  if (!keep.thumbId && drop.thumbId) { keep.thumbId = drop.thumbId; keep.origId = drop.origId; keep.fileHash = drop.fileHash; keep.dims = drop.dims; }
+  await putEntry(keep); await deleteEntry(drop.id);
+}
+
+/* ================= Vibe 上传与关联 ================= */
+async function addVibes(files) {
+  let n = 0;
+  for (const f of files) {
+    try {
+      const v = { id: uid(), name: f.name.replace(/\.[^.]+$/, ''), note: '', models: [], sigs: [], createdAt: now() };
+      if (/\.(naiv4vibe|naiv4vibebundle|json)$/i.test(f.name) || f.type === 'application/json') {
+        const j = JSON.parse(await f.text());
+        v.name = j.name || v.name;
+        v.fileId = uid(); await putBlob(v.fileId, new Blob([await f.arrayBuffer()], { type: 'application/json' }), 'file');
+        let prev = null;
+        if (j.thumbnail) prev = j.thumbnail.startsWith('data:') ? dataURLtoBlob(j.thumbnail) : b64ToBlob(j.thumbnail, 'image/jpeg');
+        else if (j.image) prev = b64ToBlob(j.image, 'image/png');
+        if (prev) { const t = await makeThumb(prev, 900); v.previewId = uid(); await putBlob(v.previewId, t.blob, 'thumb'); }
+        const enc = firstEncoding(j); if (enc) v.sigs.push('h' + hashStr(enc));
+        v.models = vibeModelsFromFile(j);
+        if (j.importInfo?.strength != null) v.note = `默认强度 ${j.importInfo.strength}`;
+      } else {
+        const t = await makeThumb(f, 900); v.previewId = uid(); await putBlob(v.previewId, t.blob, 'thumb');
+      }
+      await putVibe(v); n++;
+    } catch (err) { toast(`${esc(f.name)} 读取失败：${esc(err.message)}`, 5000); }
+  }
+  if (n) { toast(`已添加 ${n} 个 vibe`); S.view = 'vibes'; render(); }
+}
+async function linkSlot(e, slot, vid) {
+  const v = e.vibes?.[slot]; const vb = S.vibes.find(x => x.id === vid); if (!v || !vb) return 0;
+  v.vibeId = vid; await putEntry(e);
+  let auto = 0;
+  if (v.sig) {
+    if (!vb.sigs?.includes(v.sig)) { (vb.sigs ||= []).push(v.sig); await putVibe(vb); }
+    for (const o of S.entries) { let ch = false; for (const s of o.vibes || []) if (!s.vibeId && s.sig === v.sig) { s.vibeId = vid; ch = true; auto++; } if (ch) await putEntry(o); }
+  }
+  return auto;
+}
+function linkVibeModal(e, slot) {
+  if (!S.vibes.length) return ask('库里还没有 vibe', '先上传对应的 vibe，再回来点这个空心方块关联。', [{ t: '去上传', v: true, cls: 'pri' }]).then(ok => ok && pickFile('.naiv4vibe,.json,image/*', true, addVibes));
+  const m = openModal(`<h3>这张图用的是哪个 vibe？</h3><p class="muted">强度 ${e.vibes[slot]?.strength ?? '?'}。关联后空心变实心${e.vibes[slot]?.sig ? '，之后编码相同的新图会自动挂上' : ''}。</p>
+    <div class="vpick">${S.vibes.map(v => `<button data-vid="${v.id}">${v.previewId ? `<img data-blob="${v.previewId}" alt="">` : `<span>${ic('vibe', 24)}</span>`}<b>${esc(v.name)}</b></button>`).join('')}</div>
+    <div class="m-actions"><button class="btn" data-act="close">取消</button></div>`);
+  observeThumbs(m);
+  $$('.vpick button', m).forEach(b => b.onclick = async () => { const auto = await linkSlot(e, slot, b.dataset.vid); closeModal(m); toast(auto > 1 ? `已关联，另外 ${auto - 1} 张同编码的图也挂上了` : '已关联'); render(); });
+}
+
+/* ================= 灯箱 ================= */
+function openLightbox(ids, idx) {
+  if (!ids.length) return;
+  let i = clamp(idx, 0, ids.length - 1), sc = 1, tx = 0, ty = 0;
+  const lb = document.createElement('div'); lb.className = 'lb';
+  lb.innerHTML = `<div class="lb-stage"><img class="lbimg" alt="" draggable="false"></div><button class="lb-x" aria-label="关闭">${ic('x', 20)}</button>${ids.length > 1 ? `<button class="lb-p" aria-label="上一张">${ic('chev', 22)}</button><button class="lb-n" aria-label="下一张">${ic('chev', 22)}</button>` : ''}<div class="lb-c glass"></div>`;
+  document.body.append(lb);
+  const img = $('.lbimg', lb), stage = $('.lb-stage', lb);
+  const apply = () => { img.style.transform = `translate(${tx}px,${ty}px) scale(${sc})`; };
+  const show = async () => {
+    sc = 1; tx = 0; ty = 0; apply();
+    const id = ids[i], e = S.entries.find(x => x.id === id);
+    $('.lb-c', lb).textContent = `${i + 1} / ${ids.length}${e ? ' · ' + artistsOf(e).map(a => a.n).join(', ') : ''}`;
+    if (!e) return;
+    const tu = await blobURL(e.thumbId); if (ids[i] === id && tu) img.src = tu;
+    const ou = await blobURL(e.origId); if (ids[i] === id && ou) img.src = ou;
+  };
+  const nav = d => { i = (i + d + ids.length) % ids.length; show(); };
+  const close = () => { lb.remove(); S.lb = null; };
+  $('.lb-x', lb).onclick = close;
+  $('.lb-p', lb) && ($('.lb-p', lb).onclick = () => nav(-1));
+  $('.lb-n', lb) && ($('.lb-n', lb).onclick = () => nav(1));
+  stage.addEventListener('wheel', ev => { ev.preventDefault(); sc = clamp(sc * (ev.deltaY < 0 ? 1.15 : 1 / 1.15), 1, 8); if (sc === 1) { tx = 0; ty = 0; } apply(); }, { passive: false });
+  stage.addEventListener('dblclick', () => { sc = sc > 1 ? 1 : 2.5; tx = 0; ty = 0; apply(); });
+  const pts = new Map(); let start = null;
+  stage.addEventListener('pointerdown', ev => { stage.setPointerCapture(ev.pointerId); pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY }); start = { tx, ty, sc, x: ev.clientX, y: ev.clientY, dist: null, moved: false }; if (pts.size === 2) { const [a, b] = [...pts.values()]; start.dist = Math.hypot(a.x - b.x, a.y - b.y); } });
+  stage.addEventListener('pointermove', ev => {
+    if (!pts.has(ev.pointerId) || !start) return; pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+    if (pts.size === 2 && start.dist) { const [a, b] = [...pts.values()]; sc = clamp(start.sc * Math.hypot(a.x - b.x, a.y - b.y) / start.dist, 1, 8); apply(); return; }
+    const dx = ev.clientX - start.x, dy = ev.clientY - start.y; if (Math.abs(dx) + Math.abs(dy) > 6) start.moved = true;
+    if (sc > 1) { tx = start.tx + dx; ty = start.ty + dy; apply(); }
+  });
+  stage.addEventListener('pointerup', ev => {
+    pts.delete(ev.pointerId); if (!start) return;
+    const dx = ev.clientX - start.x;
+    if (sc === 1 && start.moved && Math.abs(dx) > 60 && ids.length > 1) nav(dx < 0 ? 1 : -1);
+    else if (!start.moved && ev.target === stage) close();
+    if (!pts.size) start = null;
+  });
+  S.lb = { nav, close };
+  show();
+}
+function lbIdsFor(el) {
+  const rid = el.dataset.rid;
+  if (rid && S.rowMap[rid]) return S.rowMap[rid].items.filter(e => e.thumbId).map(e => e.id);
+  return $$('.rows .card').map(c => S.entries.find(e => e.id === c.dataset.id)).filter(e => e?.thumbId).map(e => e.id);
+}
+/* ================= 动作 ================= */
+const byId = id => S.entries.find(e => e.id === id);
+const ACT = {
+  view: el => { S.view = el.dataset.v; if (S.view !== 'library') S.selectMode = false; render(); window.scrollTo({ top: 0 }); },
+  close: () => closeModal(),
+  'add-img': () => pickFile('image/*', true, addImages),
+  'add-text': () => entryEditor(null),
+  'add-vibe': () => pickFile('.naiv4vibe,.naiv4vibebundle,.json,image/*', true, addVibes),
+  newfolder: async () => { const n = await promptText('新建文件夹', '', '例如 V4.5 / V5 / 厚涂'); if (!n) return; const f = { id: uid(), name: n, createdAt: now() }; await putFolder(f); toast(`已建「${esc(n)}」`); if (S.view === 'library') refreshList(); },
+  fab: () => $('#fabMenu').classList.toggle('show'),
+  sync: () => sync(true),
+
+  'fan-step': el => fanTo(Math.round(S.homeFocus) + +el.dataset.d),
+  az: el => { const L = el.dataset.l; const i = S.homeRows.findIndex(r => L === '#' ? !/^[a-z]/i.test(r.sort) : r.sort[0]?.toUpperCase() === L); if (i >= 0) fanTo(i); },
+  'pop-go': el => { closeModal(); jumpToRow(el.dataset.rid, el.dataset.id); },
+
+  row: el => {
+    const r = S.rowMap[el.dataset.rid]; if (!r || r.items.length < 2) return;
+    if (S.expanded.has(r.key)) S.expanded.delete(r.key); else { S.expanded.add(r.key); S.animRow = r.key; }
+    const row = $(`.row[data-row="${r.id}"]`); if (!row) return refreshList();
+    row.outerHTML = rowHTML(r); S.animRow = null; observeThumbs($(`.row[data-row="${r.id}"]`));
+  },
+  prompt: el => { const id = el.dataset.id; S.openPrompts.has(id) ? S.openPrompts.delete(id) : S.openPrompts.add(id); refreshCardRow(id); },
+  sel: el => { const id = el.dataset.id; S.selected.has(id) ? S.selected.delete(id) : S.selected.add(id); el.closest('.card').classList.toggle('sel'); const sb = $('.selbox', el); if (sb) sb.innerHTML = S.selected.has(id) ? ic('check', 14) : ''; renderBulk(); },
+  star: async el => { const e = byId(el.dataset.id); if (!e) return; e.star = !e.star; await putEntry(e); el.classList.toggle('on', e.star); if (S.filters.star) refreshList(); },
+  lightbox: el => { const ids = lbIdsFor(el); openLightbox(ids, ids.indexOf(el.dataset.id)); },
+  copy: async el => {
+    const e = byId(el.dataset.id); if (!e) return; const f = el.dataset.f;
+    const txt = f === 'general' ? e.tokens.filter(t => catOf(t) === 'general').map(t => t.raw).join(', ') : e[f] || '';
+    try { await navigator.clipboard.writeText(txt); toast('已复制'); } catch { toast('复制失败，浏览器不允许'); }
+  },
+  tokmenu: (el, ev) => {
+    ev.stopPropagation();
+    const n = el.dataset.n; const cur = S.tags[n]?.c;
+    const isPre = S.entries.some(e => e.tokens?.some(t => t.n === n && t.pre));
+    popMenu(el, [{ label: esc(n) + (isPre ? '（带 artist: 前缀，固定是画师）' : '') }, ...Object.entries(CATS).map(([k, t]) => ({ t, on: cur === k, fn: async () => { S.tags[n] = { c: k, m: 1 }; await saveTags(); toast(`「${esc(n)}」改成${t}，全库同步更新`); render(); } }))]);
+  },
+  setbase: async el => { const r = S.rowMap[el.dataset.rid]; if (!r) return; S.meta.baseOverride[r.key] = el.dataset.id; await saveMeta(); toast('已设为这一行的基准'); refreshList(); },
+  del: async el => { const e = byId(el.dataset.id); if (!e) return; if (!await ask('删除这条串？', '图和参数都会删掉，无法撤销。', [{ t: '取消', v: false }, { t: '删除', v: true, cls: 'danger' }])) return; await deleteEntry(e.id); markDirty(); toast('已删除'); refreshList(); },
+  move: el => { const e = byId(el.dataset.id); if (!e) return; popMenu(el, [{ label: '移动到' }, { t: '未归档', on: !e.folderId, fn: () => moveTo([e], '') }, ...S.folders.map(f => ({ t: esc(f.name), on: e.folderId === f.id, fn: () => moveTo([e], f.id) }))]); },
+  edit: el => { const e = byId(el.dataset.id); if (e) entryEditor(e); },
+  genfor: el => { const e = byId(el.dataset.id); if (e) entryEditor(e, { focusGen: true }); },
+  uploadimg: el => { const e = byId(el.dataset.id); if (!e) return; pickFile('image/*', false, async fs => { if (!fs[0]) return; const buf = await fs[0].arrayBuffer(); if (!e.prompt) { const meta = await readMeta(buf, fs[0]); if (meta) { Object.assign(e, { prompt: meta.prompt, negative: meta.negative, params: meta.params, tokens: tokenize(meta.prompt) }); } } await attachImage(e, fs[0]); await putEntry(e); render(); classifyPending(true); }); },
+  linkvibe: el => { const e = byId(el.dataset.id); if (e) linkVibeModal(e, +el.dataset.slot); },
+  govibe: async el => { S.view = 'vibes'; render(); await sleep(30); const c = $(`.vcard[data-vid="${el.dataset.vid}"]`); if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'center' }); c.classList.add('flash'); setTimeout(() => c.classList.remove('flash'), 1600); } },
+
+  folder: (el, ev) => { if (ev.target.closest('.fmenu')) return; S.filters.folder = el.dataset.fid; refreshList(); },
+  foldermenu: (el, ev) => {
+    ev.stopPropagation(); const f = S.folders.find(x => x.id === el.dataset.fid); if (!f) return;
+    popMenu(el, [{ t: '改名', fn: async () => { const n = await promptText('文件夹改名', f.name); if (n) { f.name = n; await putFolder(f); refreshList(); } } },
+    { t: '删除', cls: 'danger', fn: async () => {
+      const c = S.entries.filter(e => e.folderId === f.id).length;
+      if (!await ask(`删除文件夹「${esc(f.name)}」？`, c ? `里面的 ${c} 条串不会删，会变成未归档。` : '', [{ t: '取消', v: false }, { t: '删除', v: true, cls: 'danger' }])) return;
+      if (!await ask('再确认一次', `真的删除「${esc(f.name)}」吗？`, [{ t: '算了', v: false }, { t: '确认删除', v: true, cls: 'danger' }])) return;
+      await deleteFolder(f.id); if (S.filters.folder === f.id) S.filters.folder = ''; markDirty(); refreshList();
+    } }]);
+  },
+  'f-star': () => { S.filters.star = !S.filters.star; render(); },
+  'f-recipe': () => { S.filters.recipe = !S.filters.recipe; render(); },
+  'clear-artist': () => { S.filters.artist = ''; render(); },
+  'expand-all': () => { Object.values(S.rowMap).forEach(r => r.items.length > 1 && S.expanded.add(r.key)); refreshList(); },
+  'collapse-all': () => { S.expanded.clear(); refreshList(); },
+  'select-mode': () => { S.selectMode = !S.selectMode; S.selected.clear(); render(); },
+  'sel-all': () => { $$('.rows .card').forEach(c => S.selected.add(c.dataset.id)); refreshList(); },
+  'bulk-move': el => { const es = [...S.selected].map(byId).filter(Boolean); if (!es.length) return toast('还没选'); popMenu(el, [{ label: `把 ${es.length} 条移动到` }, { t: '未归档', fn: () => moveTo(es, '') }, ...S.folders.map(f => ({ t: esc(f.name), fn: () => moveTo(es, f.id) }))]); },
+  'bulk-star': async () => { for (const id of S.selected) { const e = byId(id); if (e && !e.star) { e.star = true; await putEntry(e); } } refreshList(); },
+  'bulk-unstar': async () => { for (const id of S.selected) { const e = byId(id); if (e && e.star) { e.star = false; await putEntry(e); } } refreshList(); },
+  'bulk-del': async () => { const n = S.selected.size; if (!n) return; if (!await ask(`删除选中的 ${n} 条？`, '无法撤销。', [{ t: '取消', v: false }, { t: '删除', v: true, cls: 'danger' }])) return; for (const id of [...S.selected]) await deleteEntry(id); S.selected.clear(); markDirty(); refreshList(); },
+  classify: () => classifyPending(),
+
+  'vibe-img': el => { const v = S.vibes.find(x => x.id === el.dataset.vid); if (!v) return; pickFile('image/*', false, async fs => { if (!fs[0]) return; const t = await makeThumb(fs[0], 900); const old = v.previewId; v.previewId = uid(); await putBlob(v.previewId, t.blob, 'thumb'); await putVibe(v); if (old && !blobRefd(old)) await DB.del('blobs', old); render(); }); },
+  vmodel: async el => { const v = S.vibes.find(x => x.id === el.dataset.vid); if (!v) return; const m = el.dataset.m; v.models = v.models?.includes(m) ? v.models.filter(x => x !== m) : [...(v.models || []), m]; await putVibe(v); el.classList.toggle('on'); },
+  'vibe-del': async el => { const v = S.vibes.find(x => x.id === el.dataset.vid); if (!v) return; if (!await ask(`删除 vibe「${esc(v.name)}」？`, '用过它的图会变回空心方块。', [{ t: '取消', v: false }, { t: '删除', v: true, cls: 'danger' }])) return; await deleteVibe(v.id); markDirty(); render(); },
+  'jump-entry': el => jumpToEntry(el.dataset.id),
+  hsel: el => { const id = el.dataset.id; S.hsel.has(id) ? S.hsel.delete(id) : S.hsel.add(id); el.classList.toggle('on'); const b = $('[data-act="hlink"]'); if (b) b.textContent = `把选中的 ${S.hsel.size || ''} 张关联过去`; },
+  hlink: async () => { const vid = $('#hvibe')?.value; if (!vid || !S.hsel.size) return toast('先勾选图'); let n = 0; for (const id of S.hsel) { const e = byId(id); const slot = e?.vibes?.findIndex(v => !v.vibeId); if (e && slot >= 0) { await linkSlot(e, slot, vid); n++; } } S.hsel.clear(); toast(`已关联 ${n} 张`); render(); },
+
+  'artist-filter': el => { Object.assign(S.filters, { q: '', model: '', vibe: 'any', star: false, folder: '', recipe: false, artist: el.dataset.n }); S.view = 'library'; render(); window.scrollTo({ top: 0 }); },
+  'scan-dups': () => { S.dupPairs = scanDups(); render(); },
+  'dup-open': el => { const p = S.dupPairs?.[+el.dataset.i]; if (p) dupModal(p[0], p[1]); },
+
+  'test-text': async el => { el.disabled = true; try { const t = await aiChat([{ role: 'user', content: '只回复 JSON：{"ok":true}' }]); toast('连接正常：' + esc(t.slice(0, 60))); } catch (err) { toast('失败：' + esc(err.message), 6000); } finally { el.disabled = false; } },
+  'export-full': () => exportAll(true),
+  'export-data': () => exportAll(false),
+  import: () => pickFile('.json,application/json', false, fs => fs[0] && importLib(fs[0])),
+  reparse: async () => { for (const e of S.entries) { e.tokens = tokenize(e.prompt); await putEntry(e); } toast('已重新分词'); await classifyPending(); render(); },
+  'reset-ai': async () => { if (!await ask('清空 AI 分类缓存？', '你手动改过类别的词会保留。', [{ t: '取消', v: false }, { t: '清空', v: true, cls: 'danger' }])) return; for (const k in S.tags) if (!S.tags[k].m) delete S.tags[k]; await saveTags(); render(); },
+};
+async function moveTo(list, fid) { for (const e of list) { e.folderId = fid; await putEntry(e); } toast(`已移动 ${list.length} 条`); if (S.view === 'library') refreshList(); }
+
+/* ================= 事件 ================= */
+document.addEventListener('click', ev => {
+  if (S.suppressClick) { ev.preventDefault(); ev.stopPropagation(); return; }
+  const fm = $('#fabMenu'); if (fm?.classList.contains('show') && !ev.target.closest('.fab')) fm.classList.remove('show');
+  const el = ev.target.closest('[data-act]'); if (!el || el.disabled) return;
+  const fn = ACT[el.dataset.act]; if (fn) fn(el, ev);
+}, true);
+document.addEventListener('pointerdown', ev => {
+  const tr = ev.target.closest('.track'); if (!tr || ev.pointerType !== 'mouse' || ev.button !== 0) return;
+  if (ev.target.closest('input,textarea,select,.xp')) return;
+  const sx = ev.clientX, sl = tr.scrollLeft; let moved = false;
+  const mv = e => { const dx = e.clientX - sx; if (!moved && Math.abs(dx) > 6) { moved = true; tr.classList.add('dragging'); } if (moved) tr.scrollLeft = sl - dx; };
+  const up = () => { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); tr.classList.remove('dragging'); if (moved) { S.suppressClick = true; setTimeout(() => S.suppressClick = false, 0); } };
+  document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
+});
+document.addEventListener('change', ev => {
+  const t = ev.target;
+  if (t.dataset.set) {
+    const v = t.type === 'checkbox' ? t.checked : t.type === 'number' ? (t.value === '' ? null : +t.value) : t.value;
+    setPath(SET, t.dataset.set, v); saveSettings();
+    if (t.dataset.set === 'theme') applyTheme();
+    if (['text.provider', 'theme'].includes(t.dataset.set)) render();
+    if (t.dataset.set.startsWith('gh.')) renderSyncBadge();
+    if (t.dataset.set === 'text.key' && v) classifyPending();
+    return;
+  }
+  if (t.dataset.setModels !== undefined) {
+    const rows = t.value.split('\n').map(l => l.split('|').map(s => s.trim())).filter(p => p[0] && p[1]).map(([match, label, api]) => ({ match, label, api: api || label }));
+    if (!rows.length) return toast('至少要有一行');
+    SET.models = rows; saveSettings(); toast('模型映射已更新'); return;
+  }
+  if (t.dataset.filter && t.dataset.filter !== 'q') { S.filters[t.dataset.filter] = t.value; refreshList(); return; }
+  if (t.dataset.vchg) { const v = S.vibes.find(x => x.id === t.dataset.vid); if (v) { v[t.dataset.vchg] = t.value; putVibe(v); } }
+});
+document.addEventListener('input', ev => {
+  const t = ev.target;
+  if (t.dataset.filter === 'q') { S.filters.q = t.value; clearTimeout(S.qt); S.qt = setTimeout(refreshList, 180); }
+  else if (t.dataset.actInput === 'thumb') { SET.thumb = +t.value; $('.rows')?.style.setProperty('--tw', t.value + 'px'); clearTimeout(S.tt); S.tt = setTimeout(saveSettings, 300); }
+  else if (t.id === 'homeSearch') {
+    const q = normTag(t.value); if (!q) return;
+    let i = S.homeRows.findIndex(r => r.names.some(n => n.startsWith(q)));
+    if (i < 0) i = S.homeRows.findIndex(r => r.names.some(n => n.includes(q)));
+    if (i >= 0) fanTo(i);
+  }
+});
+document.addEventListener('keydown', ev => {
+  if (S.lb) { if (ev.key === 'Escape') S.lb.close(); if (ev.key === 'ArrowLeft') S.lb.nav(-1); if (ev.key === 'ArrowRight') S.lb.nav(1); return; }
+  if (ev.key === 'Escape') { if (S.pop) closePop(); else closeModal(); return; }
+  if (S.view === 'home' && !ev.target.closest('input,textarea') && !$('#modals .mask')) {
+    if (ev.key === 'ArrowLeft') fanTo(Math.round(S.homeFocus) - 1);
+    if (ev.key === 'ArrowRight') fanTo(Math.round(S.homeFocus) + 1);
+    if (ev.key === 'Enter') openPop(Math.round(S.homeFocus));
+  }
+});
+window.addEventListener('resize', () => { const f = $('#fan'); if (f) { f.style.setProperty('--fw', fanW() + 'px'); updateFan(); } });
+document.addEventListener('dragover', ev => { if (ev.dataTransfer?.types?.includes('Files')) { ev.preventDefault(); document.body.classList.add('dropping'); } });
+document.addEventListener('dragleave', ev => { if (!ev.relatedTarget) document.body.classList.remove('dropping'); });
+document.addEventListener('drop', ev => {
+  if (!ev.dataTransfer?.files?.length) return; ev.preventDefault(); document.body.classList.remove('dropping');
+  const fs = [...ev.dataTransfer.files];
+  const vibes = fs.filter(f => /\.(naiv4vibe|naiv4vibebundle)$/i.test(f.name));
+  if (vibes.length) addVibes(vibes);
+  addImages(fs.filter(f => !vibes.includes(f)));
+});
+document.addEventListener('paste', ev => {
+  if (ev.target.closest('input,textarea') || $('#modals .mask')) return;
+  const files = [...(ev.clipboardData?.files || [])];
+  if (files.length) { addImages(files); return; }
+  const txt = ev.clipboardData?.getData('text'); if (txt && txt.length > 20) { entryEditor(null); setTimeout(() => { const p = $('#edP'); if (p) p.value = txt; }, 30); }
+});
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && GH.ok() && SET.gh.auto && now() - S.lastSync > 60000) sync(); });
+
+/* ================= 启动 ================= */
+async function init() {
+  applyTheme();
+  try { await DB.open(); } catch (err) { $('#main').innerHTML = emptyState('浏览器不允许本地存储', esc(err.message)); return; }
+  S.entries = await DB.all('entries'); S.vibes = await DB.all('vibes'); S.folders = await DB.all('folders');
+  S.tags = await DB.kvGet('tags', {});
+  S.meta = Object.assign({ baseOverride: {}, keepPairs: [], tombstones: {} }, await DB.kvGet('meta', {}));
+  S.blobIndex = await DB.kvGet('blobIndex', {});
+  render();
+  navigator.storage?.persist?.();
+  if (GH.ok()) sync(); else classifyPending(true);
+}
+init();
+
+</script>
+</body>
+</html>
