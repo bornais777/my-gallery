@@ -644,7 +644,7 @@ const fmtTime = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.ge
 const DEF = {
   text: { provider: 'openai', base: '', key: '', model: '', visionModel: '' },
   gpt: { mode: 'images', base: '', key: '', model: 'gpt-image-1', size: '1024x1536' },
-  nai: { mode: 'nai', base: '', key: '', model: 'nai-diffusion-4-5-full', size: '832x1216', steps: 28, scale: 5, sampler: 'k_euler_ancestral', neg: 'lowres, artistic error, worst quality, bad quality, jpeg artifacts, very displeasing, watermark, signature, text', quality: 'best quality, amazing quality, very aesthetic, absurdres' },
+  nai: { mode: 'chami', base: 'http://chami.yyqzx.com', key: '', model: 'nai-diffusion-4-5-full', size: '832x1216', steps: 28, scale: 5, sampler: 'k_euler_ancestral', neg: 'lowres, artistic error, worst quality, bad quality, jpeg artifacts, very displeasing, watermark, signature, text', quality: 'best quality, amazing quality, very aesthetic, absurdres' },
   userName: 'User',
   models: [
     { match: 'V4\\.5 Curated|4-5-curated', label: 'V4.5 Curated', api: 'nai-diffusion-4-5-curated' },
@@ -1068,47 +1068,67 @@ async function unzipFirst(u8) {
   return method === 0 ? data : await inflate(data, 'deflate-raw');
 }
 async function genNAI({ prompt, negative, model, size, seed, steps, scale, sampler, vibes, chars }) {
-  const n = SET.nai; if (!n.key) throw new Error('先在设置里填 NAI 生图 API');
+  const n = SET.nai;
+  if (!n.key) throw new Error('先在设置里填 Chami 的组合 API Key（用户 API Key + 内部 NAI Key）');
   const [w, h] = (size || n.size).split('x').map(Number);
   const mdl = model || n.model;
-  const sd = seed ?? Math.floor(Math.random() * 4294967295);
-  if (n.mode === 'openai') {
-    if (chars?.length) prompt = [prompt, ...chars].join(', ');
-    const r = await fetch(v1(n.base) + '/images/generations', { method: 'POST', headers: hdr(n.key), body: JSON.stringify({ model: mdl, prompt, negative_prompt: negative || '', size: `${w}x${h}`, n: 1, seed: sd, steps: steps ?? n.steps, scale: scale ?? n.scale, sampler: sampler || n.sampler }) });
-    if (!r.ok) throw await apiErr(r, 'NAI ');
-    return { blob: await parseImagesResponse(r), seed: sd };
-  }
+  const sd = seed ?? Math.floor(Math.random() * 2147483647);
+  if ((vibes || []).length > 3) throw new Error('Chami 的图生图最多支持 3 张参考图，请减少 vibe 数量');
+  const neg = negative || n.neg || '';
   const params = {
-    params_version: 3, width: w, height: h, scale: scale ?? n.scale, sampler: sampler || n.sampler, steps: steps ?? n.steps, n_samples: 1, seed: sd,
-    ucPreset: 0, qualityToggle: false, sm: false, sm_dyn: false, dynamic_thresholding: false, cfg_rescale: 0, noise_schedule: 'karras',
-    legacy: false, add_original_image: true, prefer_brownian: true, deliberate_euler_ancestral_bug: false, use_coords: false,
-    negative_prompt: negative || '', characterPrompts: [],
-    v4_prompt: { caption: { base_caption: prompt, char_captions: [] }, use_coords: false, use_order: true },
-    v4_negative_prompt: { caption: { base_caption: negative || '', char_captions: [] }, legacy_uc: false },
+    params_version: 3,
+    width: w,
+    height: h,
+    scale: scale ?? n.scale,
+    sampler: sampler || n.sampler,
+    steps: steps ?? n.steps,
+    n_samples: 1,
+    controlnet_strength: 1,
+    legacy: false,
+    add_original_image: true,
+    cfg_rescale: 0.18,
+    noise_schedule: 'native',
+    seed: sd,
+    negative_prompt: neg,
+    extra_noise_seed: Math.floor(Math.random() * 2147483647),
+    ucPreset: 2,
+    qualityToggle: true,
+    dynamic_thresholding: false,
+    use_coords: true,
+    v4_prompt: [prompt, ...(chars || [])],
+    v4_negative_prompt: [neg],
+    skip_cfg_above_sigma: 58,
   };
-  if (chars?.length) {
-    const pos = chars.map((_, i) => ({ x: chars.length === 1 ? 0.5 : +(0.1 + 0.8 * i / (chars.length - 1)).toFixed(1), y: 0.5 }));
-    params.v4_prompt.caption.char_captions = chars.map((c, i) => ({ char_caption: c, centers: [pos[i]] }));
-    params.v4_negative_prompt.caption.char_captions = chars.map((_, i) => ({ char_caption: '', centers: [pos[i]] }));
-    params.characterPrompts = chars.map((c, i) => ({ prompt: c, uc: '', center: pos[i], enabled: true }));
-  }
   if (vibes?.length) {
     params.reference_image_multiple = vibes.map(v => v.enc);
     params.reference_strength_multiple = vibes.map(v => v.strength ?? 0.6);
     params.reference_information_extracted_multiple = vibes.map(v => v.info ?? 1);
   }
-  const base = (n.base || 'https://image.novelai.net').replace(/\/+$/, '');
-  const r = await fetch(base + '/ai/generate-image', { method: 'POST', headers: hdr(n.key), body: JSON.stringify({ input: prompt, model: mdl, action: 'generate', parameters: params }) });
-  if (!r.ok) throw await apiErr(r, 'NAI ');
-  const ct = r.headers.get('content-type') || ''; const u8 = new Uint8Array(await r.arrayBuffer());
+  const base = (n.base || 'http://chami.yyqzx.com').replace(/\/+$/, '');
+  const r = await fetch(base + '/image/chami', {
+    method: 'POST',
+    headers: hdr(n.key),
+    body: JSON.stringify({ input: prompt, model: mdl, action: 'generate', parameters: params }),
+  });
+  const ct = r.headers.get('content-type') || '';
+  const u8 = new Uint8Array(await r.arrayBuffer());
+  if (!r.ok) {
+    const detail = td.decode(u8).slice(0, 1000);
+    let message = detail;
+    try { message = JSON.parse(detail).error?.message || JSON.parse(detail).message || detail; } catch { }
+    throw new Error(`NAI / Chami ${r.status}: ${message || '请求失败'}`);
+  }
   if (u8[0] === 0x50 && u8[1] === 0x4b) return { blob: new Blob([await unzipFirst(u8)], { type: 'image/png' }), seed: sd };
   if (ct.startsWith('image/') || u8[0] === 0x89) return { blob: new Blob([u8], { type: ct.startsWith('image/') ? ct : 'image/png' }), seed: sd };
   const t = td.decode(u8);
   try {
-    const j = JSON.parse(t); const b = j.data?.[0]?.b64_json || j.data?.[0]?.url || j.image || j.images?.[0] || (typeof j.data === 'string' ? j.data : null);
-    if (typeof b === 'string') return { blob: b.startsWith('http') ? await fetchImageBlob(b) : b64ToBlob(b.replace(/^data:image\/\w+;base64,/, ''), 'image/png'), seed: sd };
-  } catch { }
-  return { blob: await toImage(findImageInText(t)), seed: sd };
+    const j = JSON.parse(t);
+    const message = j.error?.message || j.error || j.message || j.msg;
+    if (message) throw new Error(String(message));
+  } catch (e) {
+    if (e instanceof Error && !/JSON/.test(e.message)) throw e;
+  }
+  throw new Error('Chami 返回内容不是图片或 ZIP：' + t.slice(0, 300));
 }
 
 /* ================= vibe 文件 ================= */
@@ -1764,9 +1784,8 @@ function renderSettings(main) {
      <div class="srow"><button class="btn" data-act="test-text">测试连接</button></div>
    </section>
    <section class="scard glass"><h3>${ic('wand')}NAI 生图</h3>
-     ${sel('nai.mode', '中转站接口格式', [['nai', 'NovelAI 官方格式 /ai/generate-image'], ['openai', 'OpenAI 格式 /v1/images/generations']])}
-     ${fld('nai.base', '接口地址', '中转站地址；官方格式会拼上 /ai/generate-image')}
-     ${fld('nai.key', 'Key', '', 'password')}
+     ${fld('nai.base', 'Chami 接口地址', '默认 http://chami.yyqzx.com；自动拼接 /image/chami')}
+     ${fld('nai.key', '组合 API Key（16 位用户 Key + 内部 NAI Key）', '', 'password')}
      ${sel('nai.model', '默认模型', SET.models.map(m => [m.api, `${m.label}（${m.api}）`]))}
      <div class="f3">${sel('nai.size', '尺寸', [['832x1216', '832×1216 竖'], ['1216x832', '1216×832 横'], ['1024x1024', '1024×1024 方']])}${fld('nai.steps', 'Steps', '28', 'number')}${fld('nai.scale', 'Scale', '5', 'number', 'step="0.1"')}</div>
      ${sel('nai.sampler', '采样器', [['k_euler_ancestral', 'Euler Ancestral'], ['k_euler', 'Euler'], ['k_dpmpp_2s_ancestral', 'DPM++ 2S Ancestral'], ['k_dpmpp_2m_sde', 'DPM++ 2M SDE'], ['k_dpmpp_2m', 'DPM++ 2M'], ['k_dpmpp_sde', 'DPM++ SDE']])}
