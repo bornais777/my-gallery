@@ -1111,7 +1111,7 @@ async function genNAIRequest({ prompt, negative, model, size, seed, steps, scale
     extra_noise_seed: extraSeed,
     negative_prompt: neg,
     v4_prompt: {
-      caption: { base_caption: prompt, char_captions: [] },
+      caption: { base_caption: prompt, char_captions: (chars || []).map(char => ({ char_caption: char })) },
       use_coords: true,
       use_order: true,
     },
@@ -1127,7 +1127,7 @@ async function genNAIRequest({ prompt, negative, model, size, seed, steps, scale
   }
 
   // 同一页面内所有 NAI 入口排队执行，避免分镜、封面和手动生图并发。
-  const wait = Math.max(0, 7500 - (Date.now() - naiLastRequestAt));
+  const wait = Math.max(0, 20000 - (Date.now() - naiLastRequestAt));
   if (wait) await new Promise(resolve => setTimeout(resolve, wait));
   naiLastRequestAt = Date.now();
 
