@@ -644,7 +644,7 @@ const fmtTime = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.ge
 const DEF = {
   text: { provider: 'openai', base: '', key: '', model: '', visionModel: '' },
   gpt: { mode: 'images', base: '', key: '', model: 'gpt-image-1', size: '1024x1536' },
-  nai: { mode: 'chami', base: 'http://chami.yyqzx.com', key: '', model: 'nai-diffusion-4-5-full', size: '832x1216', steps: 28, scale: 5, sampler: 'k_euler_ancestral', neg: 'lowres, artistic error, worst quality, bad quality, jpeg artifacts, very displeasing, watermark, signature, text', quality: 'best quality, amazing quality, very aesthetic, absurdres' },
+  nai: { mode: 'chami', base: 'http://chami.yyqzx.com', key: '', model: 'nai-diffusion-4-5-full', size: '832x1216', steps: 28, scale: 3.5, sampler: 'k_euler_ancestral', neg: 'lowres, artistic error, worst quality, bad quality, jpeg artifacts, very displeasing, watermark, signature, text', quality: 'best quality, amazing quality, very aesthetic, absurdres' },
   userName: 'User',
   models: [
     { match: 'V4\\.5 Curated|4-5-curated', label: 'V4.5 Curated', api: 'nai-diffusion-4-5-curated' },
@@ -1067,43 +1067,70 @@ async function unzipFirst(u8) {
   const data = u8.subarray(off + 30 + nl + xl, off + 30 + nl + xl + csize);
   return method === 0 ? data : await inflate(data, 'deflate-raw');
 }
-async function genNAI({ prompt, negative, model, size, seed, steps, scale, sampler, vibes, chars }) {
+// Chami 要求全局串行，且两次请求至少间隔 7.5 秒。
+let naiRequestTail = Promise.resolve();
+let naiLastRequestAt = 0;
+
+function genNAI(args) {
+  const run = naiRequestTail.then(() => genNAIRequest(args));
+  naiRequestTail = run.catch(() => {});
+  return run;
+}
+
+async function genNAIRequest({ prompt, negative, model, size, seed, steps, scale, sampler, vibes, chars }) {
   const n = SET.nai;
   if (!n.key) throw new Error('先在设置里填 Chami 的组合 API Key（用户 API Key + 内部 NAI Key）');
   const [w, h] = (size || n.size).split('x').map(Number);
   const mdl = model || n.model;
+  const isV5 = mdl === 'nai-diffusion-5-full';
   const sd = seed ?? Math.floor(Math.random() * 2147483647);
   if ((vibes || []).length > 3) throw new Error('Chami 的图生图最多支持 3 张参考图，请减少 vibe 数量');
   const neg = negative || n.neg || '';
+  const extraSeed = seed == null || Number(seed) < 0
+    ? Math.floor(Math.random() * 2147483647)
+    : sd;
   const params = {
-    params_version: 3,
+    params_version: isV5 ? 4 : 3,
     width: w,
     height: h,
-    scale: scale ?? n.scale,
-    sampler: sampler || n.sampler,
+    scale: scale ?? (n.scale ?? (isV5 ? 5 : 3.5)),
+    sampler: sampler || 'k_euler_ancestral',
     steps: steps ?? n.steps,
     n_samples: 1,
+    ucPreset: 2,
+    qualityToggle: true,
+    dynamic_thresholding: !isV5,
+    use_coords: true,
+    skip_cfg_above_sigma: isV5 ? 19 : 58,
     controlnet_strength: 1,
     legacy: false,
     add_original_image: true,
-    cfg_rescale: 0.18,
-    noise_schedule: 'native',
+    cfg_rescale: 0,
+    noise_schedule: 'karras',
     seed: sd,
+    extra_noise_seed: extraSeed,
     negative_prompt: neg,
-    extra_noise_seed: Math.floor(Math.random() * 2147483647),
-    ucPreset: 2,
-    qualityToggle: true,
-    dynamic_thresholding: false,
-    use_coords: true,
-    v4_prompt: [prompt, ...(chars || [])],
-    v4_negative_prompt: [neg],
-    skip_cfg_above_sigma: 58,
+    v4_prompt: {
+      caption: { base_caption: prompt, char_captions: [] },
+      use_coords: true,
+      use_order: true,
+    },
+    v4_negative_prompt: {
+      caption: { base_caption: neg, char_captions: [] },
+    },
   };
+  if (isV5) params.uncond_scale = 0.0;
   if (vibes?.length) {
     params.reference_image_multiple = vibes.map(v => v.enc);
     params.reference_strength_multiple = vibes.map(v => v.strength ?? 0.6);
     params.reference_information_extracted_multiple = vibes.map(v => v.info ?? 1);
   }
+
+  // 同一页面内所有 NAI 入口排队执行，避免分镜、封面和手动生图并发。
+  const wait = Math.max(0, 7500 - (Date.now() - naiLastRequestAt));
+  if (wait) await new Promise(resolve => setTimeout(resolve, wait));
+  naiLastRequestAt = Date.now();
+
   const base = (n.base || 'http://chami.yyqzx.com').replace(/\/+$/, '');
   const r = await fetch(base + '/image/chami', {
     method: 'POST',
@@ -1787,7 +1814,7 @@ function renderSettings(main) {
      ${fld('nai.base', 'Chami 接口地址', '默认 http://chami.yyqzx.com；自动拼接 /image/chami')}
      ${fld('nai.key', '组合 API Key（16 位用户 Key + 内部 NAI Key）', '', 'password')}
      ${sel('nai.model', '默认模型', SET.models.map(m => [m.api, `${m.label}（${m.api}）`]))}
-     <div class="f3">${sel('nai.size', '尺寸', [['832x1216', '832×1216 竖'], ['1216x832', '1216×832 横'], ['1024x1024', '1024×1024 方']])}${fld('nai.steps', 'Steps', '28', 'number')}${fld('nai.scale', 'Scale', '5', 'number', 'step="0.1"')}</div>
+     <div class="f3">${sel('nai.size', '尺寸', [['832x1216', '832×1216 竖'], ['1216x832', '1216×832 横'], ['1024x1024', '1024×1024 方']])}${fld('nai.steps', 'Steps', '28', 'number')}${fld('nai.scale', 'Scale', '3.5', 'number', 'step="0.1"')}</div>
      ${sel('nai.sampler', '采样器', [['k_euler_ancestral', 'Euler Ancestral'], ['k_euler', 'Euler'], ['k_dpmpp_2s_ancestral', 'DPM++ 2S Ancestral'], ['k_dpmpp_2m_sde', 'DPM++ 2M SDE'], ['k_dpmpp_2m', 'DPM++ 2M'], ['k_dpmpp_sde', 'DPM++ SDE']])}
      <label class="field"><span>默认质量词（分镜和封面会加在末尾）</span><textarea rows="2" data-set="nai.quality">${esc(SET.nai.quality)}</textarea></label>
      <label class="field"><span>默认负面（分镜和封面用）</span><textarea rows="3" data-set="nai.neg">${esc(SET.nai.neg)}</textarea></label>
