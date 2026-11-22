@@ -878,6 +878,31 @@ function scanDups() {
   return pairs;
 }
 function pendingTags() { const p = new Set(); for (const e of S.entries) for (const t of e.tokens || []) if (catOf(t) === 'pending') p.add(t.n); return [...p]; }
+function artistGroupLabel(r) { return S.meta.artistNames?.[r.key] || r.names.join(' · ') || '未命名画师组'; }
+async function setArtistGroupName(r, useAI = false) {
+  if (!r || r.key === '__none__') return;
+  if (!useAI) { const v = await promptText('给画师组命名', S.meta.artistNames?.[r.key] || '', '例如：清透赛璐璐 / 柔和厚涂'); if (v == null) return; S.meta.artistNames ||= {}; if (v.trim()) S.meta.artistNames[r.key] = v.trim(); else delete S.meta.artistNames[r.key]; await saveMeta(); refreshList(); return; }
+  if (!aiReady()) return toast('先在设置里配置文字 API，或者使用「命名」手动填写');
+  const e = r.base; const tags = [...new Set(r.items.flatMap(x => (x.tokens || []).filter(t => ['artist','style'].includes(catOf(t))).map(t => t.raw)))].slice(0,80);
+  const wait = toast('AI 正在分析画风并命名…',60000);
+  try {
+    let image = null;
+    if (e?.origId) { try { const blob = await getBlob(e.origId); const small = await makeThumb(blob,768,'image/jpeg'); image = { mime:'image/jpeg', b64: await blobToB64(small.blob) }; } catch {} }
+    const out = await aiChat([{role:'system',content:'你是插画风格命名助手。根据参考图的视觉风格和标签，取一个简短、容易辨认的中文风格名称，2到8个汉字。不要写解释，不要加引号，不要猜测画师身份。'}, {role:'user',content:'画师标签：'+r.names.join('、')+'\n风格标签：'+tags.join(', ')+'\n请只返回风格名称。'}],{json:false,image});
+    const name = String(out).trim().split('\n')[0].split('。')[0].slice(0,24);
+    if (name) { S.meta.artistNames ||= {}; S.meta.artistNames[r.key] = name; await saveMeta(); }
+    wait.remove(); refreshList();
+  } catch(err) { wait.remove(); toast('AI 命名失败：'+esc(err.message),5000); }
+}
+async function nameNewArtistGroups(entries) {
+  if (!aiReady() || !entries?.length) return;
+  for (const r of buildRows(entries)) if (r.key !== '__none__' && !S.meta.artistNames?.[r.key]) await setArtistGroupName(r,true);
+}
+async function manualClassifyModal() {
+  const tags = pendingTags(); if (!tags.length) return toast('没有待分类标签；已分类的画师或风格标签可直接点击标签修改');
+  const m = openModal(`<div class=\"ed-head\"><h3>手动分类待判定标签</h3><button class=\"btn icon-btn ghost\" data-act=\"close\">${ic('x')}</button></div><p class=\"muted sm\">不需要连接 AI。选择类别后会保存，并立即影响画师分组。</p><div class=\"tag-classify-list\">${tags.map((n,i)=>`<label class=\"row-inline\"><span>${esc(n)}</span><select data-tag-i=\"${i}\"><option value=\"artist\">画师</option><option value=\"style\">风格</option><option value=\"general\">通用</option><option value=\"scene\">画面</option></select></label>`).join('')}</div><div class=\"m-actions\"><button class=\"btn\" data-act=\"close\">取消</button><button class=\"btn pri\" id=\"tagClassSave\">保存分类</button></div>`,{wide:true});
+  $('#tagClassSave',m).onclick = async () => { $('[data-tag-i]',m).forEach(sel=>{ S.tags[tags[+sel.dataset.tagI]]={c:sel.value,m:1}; }); await saveTags(); closeModal(m); render(); toast('标签分类已保存'); };
+}
 
 /* ================= 文字 AI ================= */
 const aiReady = () => !!SET.text.key;
@@ -1626,7 +1651,7 @@ function renderLibrary(main) {
       <button class="btn tgl ${f.recipe ? 'on' : ''}" data-act="f-recipe" title="只显示用了 vibe 的串，不分组">${ic('vibe', 15)}配方视图</button>
       <label class="slider" title="缩略图大小">${ic('image', 15)}<input type="range" min="140" max="380" value="${SET.thumb}" data-act-input="thumb"></label>
       ${f.recipe ? '' : `<button class="btn" data-act="expand-all">全部推开</button><button class="btn" data-act="collapse-all">全部收起</button>`}
-      <button class="btn tgl ${S.selectMode ? 'on' : ''}" data-act="select-mode">${ic('check', 15)}多选</button>
+      <button class="btn tgl ${S.selectMode ? 'on' : ''}" data-act="select-mode">${ic('check', 15)}多选</button><button class="btn" data-act="classify-manual">手动分类</button>
     </div>
     ${f.artist ? `<div class="filter-note">只看画师 <b>${esc(f.artist)}</b><button class="btn sm" data-act="clear-artist">${ic('x', 13)}清除</button></div>` : ''}
     ${pend ? `<div class="notice glass">${ic('wand', 15)}<span>有 ${pend} 个词还没分类，没分类的词不会被当成画师。</span>${aiReady() ? `<button class="btn sm pri" data-act="classify">让 AI 分类</button>` : `<button class="btn sm" data-act="view" data-v="settings">去填文字 API</button>`}</div>` : ''}
@@ -1651,7 +1676,8 @@ function rowHTML(r) {
   const open = r.items.length > 1 && S.expanded.has(r.key);
   return `<section class="row glass ${open ? 'open' : ''} ${S.animRow === r.key ? 'anim' : ''}" data-row="${r.id}">
     <header class="row-h">
-      <div class="row-names">${r.names.length ? r.names.map(x => `<span class="rn">${esc(x)}</span>`).join('<i class="dot"></i>') : '<span class="muted">没有识别到画师</span>'}</div>
+      <div class="row-names">${r.names.length ? `<span class="rn">${esc(artistGroupLabel(r))}</span>${S.meta.artistNames?.[r.key] ? `<small class="muted">${esc(r.names.join(' · '))}</small>` : ''}` : '<span class="muted">没有识别到画师</span>'}</div>
+      ${r.names.length ? `<button class="btn xs ghost" data-act="artist-rename" data-rid="${r.id}">命名</button><button class="btn xs ghost" data-act="artist-ai-name" data-rid="${r.id}">AI 命名</button>` : ''}
       <span class="count">${r.items.length} 条</span>
       ${r.items.length > 1 ? `<button class="btn sm ghost rowtgl" data-act="row" data-rid="${r.id}">${open ? '收起' : '推开'}${ic('chev', 14)}</button>` : ''}
     </header>
@@ -2043,6 +2069,7 @@ async function addImages(files) {
     }
   }
   await classifyPending();
+  await nameNewArtistGroups(added);
   await checkDups(added);
 }
 async function ocrEntry(e) {
@@ -2198,6 +2225,9 @@ const ACT = {
   sync: () => sync(true),
 
   'fan-step': el => fanTo(Math.round(S.homeFocus) + +el.dataset.d),
+  'artist-rename': async el => { const r = buildRows(S.entries).find(x => x.id === el.dataset.rid); if (r) await setArtistGroupName(r,false); },
+  'artist-ai-name': async el => { const r = buildRows(S.entries).find(x => x.id === el.dataset.rid); if (r) await setArtistGroupName(r,true); },
+  'classify-manual': () => manualClassifyModal(),
   az: el => { const L = el.dataset.l; const i = S.homeRows.findIndex(r => L === '#' ? !/^[a-z]/i.test(r.sort) : r.sort[0]?.toUpperCase() === L); if (i >= 0) fanTo(i); },
   'pop-go': el => { closeModal(); jumpToRow(el.dataset.rid, el.dataset.id); },
 
@@ -2605,7 +2635,7 @@ function artistStringOf(e) {
 function boardPromptOf(e) { return typeof e?.prompt === 'string' && e.prompt.trim() ? e.prompt.trim() : artistStringOf(e); }
 function rowOptions(sel = '') {
   const rows = buildRows(S.entries).filter(r => r.key !== '__none__');
-  return `<option value="">从画谱选一组画师…</option>` + rows.map(r => `<option value="${esc(r.base.id)}" ${sel === r.base.id ? 'selected' : ''}>${esc(r.names.join(' · '))}</option>`).join('');
+  return `<option value="">从画谱选一组画师…</option>` + rows.map(r => `<option value="${esc(r.base.id)}" ${sel === r.base.id ? 'selected' : ''}>${esc(artistGroupLabel(r))}</option>`).join('');
 }
 
 /* ================= 角色卡：界面 ================= */
