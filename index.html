@@ -1720,7 +1720,7 @@ function renderLibrary(main) {
       <button class="btn tgl ${S.selectMode ? 'on' : ''}" data-act="select-mode">${ic('check', 15)}多选</button><button class="btn" data-act="classify-manual">手动分类</button>
     </div>
     ${f.artist ? `<div class="filter-note">只看画师 <b>${esc(f.artist)}</b><button class="btn sm" data-act="clear-artist">${ic('x', 13)}清除</button></div>` : ''}
-    ${pend ? `<div class="notice glass">${ic('wand', 15)}<span>有 ${pend} 个词还没分类，没分类的词不会被当成画师。</span>${aiReady() ? `<button class="btn sm pri" data-act="classify">让 AI 分类</button>` : `<button class="btn sm" data-act="view" data-v="settings">去填文字 API</button>`}</div>` : ''}
+    ${pend ? `<div class="notice glass">${ic('wand', 15)}<span>有 ${pend} 个词还没分类。分镜选取画师串时，未分类词和画面词不会自动带入；点「手动分类」可把它们归为画师、风格、通用或画面。</span>${aiReady() ? `<button class="btn sm pri" data-act="classify">让 AI 分类</button>` : `<button class="btn sm" data-act="view" data-v="settings">去填文字 API</button>`}</div>` : ''}
     <div class="folders">${folderBar()}</div>
   </div>
   <div class="rows" style="--tw:${SET.thumb}px">${listHTML()}</div>`;
@@ -2702,7 +2702,17 @@ async function aiAppearance(text) { const t = await aiChat([{ role: 'system', co
 function artistStringOf(e) {
   return compTokens(e).map(t => t.c === 'artist' ? (t.w !== 1 ? `${t.w}::artist:${t.n}::` : `artist:${t.n}`) : (t.w !== 1 ? `${t.w}::${t.n}::` : t.n)).join(', ');
 }
-function boardPromptOf(e) { return typeof e?.prompt === 'string' && e.prompt.trim() ? e.prompt.trim() : artistStringOf(e); }
+function boardPromptOf(e) {
+  if (!e) return '';
+  // 分镜从画谱选取时只带入可复用的画师、画风和通用质量词；
+  // 人物、服装、姿势、地点、构图等场景词留在原条目中，不污染后续所有分镜。
+  const keep = (e.tokens || []).filter(t => ['artist', 'style', 'general'].includes(catOf(t)));
+  const out = keep.map(t => {
+    const raw = String(t.raw || t.n || '').trim();
+    return !raw ? '' : (t.w !== 1 ? `${t.w}::${raw}::` : raw);
+  }).filter(Boolean).join(', ');
+  return out || artistStringOf(e);
+}
 function rowOptions(sel = '') {
   const rows = buildRows(S.entries).filter(r => r.key !== '__none__');
   return `<option value="">从画谱选一组画师…</option>` + rows.map(r => `<option value="${esc(r.base.id)}" ${sel === r.base.id ? 'selected' : ''}>${esc(artistGroupLabel(r))}</option>`).join('');
