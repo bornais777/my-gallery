@@ -2853,7 +2853,7 @@ function coverModal(c) {
   };
 }
 async function saveGenToLibrary(blob, { prompt, negative, seed, model, folderId = '', note = '', size }) {
-  const e = { id: uid(), createdAt: now(), source: 'gen', star: false, prompt, negative: negative || '', chars: [], params: { seed: seed ?? null, steps: SET.nai.steps, scale: SET.nai.scale, sampler: SET.nai.sampler, modelRaw: model || SET.nai.model }, vibes: [], tokens: tokenize(prompt), folderId, note };
+  const e = { id: uid(), createdAt: now(), source: 'gen', star: false, prompt, negative: negative || '', chars: [], params: { seed: seed ?? null, steps: SET.nai.steps, scale: SET.nai.scale, cfgRescale: SET.nai.cfgRescale ?? 0, sampler: SET.nai.sampler, noiseSchedule: SET.nai.noiseSchedule || 'karras', ucPreset: SET.nai.ucPreset ?? 2, qualityToggle: SET.nai.qualityToggle !== false, modelRaw: model || SET.nai.model }, vibes: [], tokens: tokenize(prompt), folderId, note };
   await attachImage(e, blob); await putEntry(e); return e;
 }
 
@@ -3279,7 +3279,7 @@ function shotHTML(b, s, i) {
 async function saveShot(b, s, folderId) {
   if (!s.imgId || s.savedId) return;
   const blob = await getBlob(s.imgId); if (!blob) return;
-  const e = { id: uid(), createdAt: now(), source: 'gen', star: false, prompt: s.prompt || shotPrompt(b, s).prompt, negative: b.negative, chars: s.charPrompts || [], params: { seed: s.seed ?? null, steps: SET.nai.steps, scale: SET.nai.scale, sampler: SET.nai.sampler, modelRaw: b.model }, vibes: b.vibeId ? [{ vibeId: b.vibeId, strength: b.vibeStrength, info: 1, sig: null }] : [], tokens: [], folderId: folderId || '', note: `分镜「${b.title || ''}」第 ${b.shots.indexOf(s) + 1} 镜：${s.cn}` };
+  const e = { id: uid(), createdAt: now(), source: 'gen', star: false, prompt: s.prompt || shotPrompt(b, s).prompt, negative: b.negative, chars: s.charPrompts || [], params: { seed: s.seed ?? null, steps: s.steps ?? b.steps ?? SET.nai.steps, scale: s.scale ?? b.scale ?? SET.nai.scale, cfgRescale: s.cfgRescale ?? b.cfgRescale ?? SET.nai.cfgRescale ?? 0, sampler: s.sampler || b.sampler || SET.nai.sampler, noiseSchedule: s.noiseSchedule || b.noiseSchedule || SET.nai.noiseSchedule, ucPreset: s.ucPreset ?? b.ucPreset ?? SET.nai.ucPreset, qualityToggle: s.qualityToggle ?? b.qualityToggle ?? SET.nai.qualityToggle, modelRaw: s.model || b.model }, vibes: b.vibeId ? [{ vibeId: b.vibeId, strength: b.vibeStrength, info: 1, sig: null }] : [], tokens: [], folderId: folderId || '', note: `分镜「${b.title || ''}」第 ${b.shots.indexOf(s) + 1} 镜：${s.cn}` };
   e.tokens = tokenize(e.prompt); e.origId = s.imgId; e.thumbId = s.thumbId;
   const th = await getBlob(s.thumbId); const bmp = await createImageBitmap(blob); e.dims = { w: bmp.width, h: bmp.height }; bmp.close?.(); void th;
   e.fileHash = await sha256(await blob.arrayBuffer());
