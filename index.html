@@ -647,7 +647,7 @@ const fmtTime = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.ge
 const DEF = {
   text: { provider: 'openai', base: '', key: '', model: '', visionModel: '' },
   gpt: { mode: 'images', base: '', key: '', model: 'gpt-image-1', size: '1024x1536' },
-  nai: { mode: 'chami', base: 'http://chami.yyqzx.com', key: '', model: 'nai-diffusion-4-5-full', size: '832x1216', steps: 28, scale: 3.5, cfgRescale: 0, ucPreset: 2, noiseSchedule: 'karras', qualityToggle: true, sampler: 'k_euler_ancestral', neg: 'lowres, artistic error, worst quality, bad quality, jpeg artifacts, very displeasing, watermark, signature, text', quality: 'best quality, amazing quality, very aesthetic, absurdres', defaultPrompt: '人像' },
+  nai: { mode: 'chami', base: 'http://chami.yyqzx.com', key: '', model: 'nai-diffusion-4-5-full', size: '832x1216', steps: 28, scale: 3.5, cfgRescale: 0, ucPreset: 2, noiseSchedule: 'karras', qualityToggle: true, sampler: 'k_euler_ancestral', neg: 'lowres, artistic error, worst quality, bad quality, jpeg artifacts, very displeasing, watermark, signature, text', quality: 'best quality, amazing quality, very aesthetic, absurdres', defaultPrompt: '' },
   userName: 'User',
   models: [
     { match: 'V5|5-full|diffusion-5', label: 'V5', api: 'nai-diffusion-5-full' },
@@ -663,6 +663,7 @@ const DEF = {
 function deepMerge(a, b) { for (const k in b) { if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k]) && a[k] && typeof a[k] === 'object' && !Array.isArray(a[k])) deepMerge(a[k], b[k]); else a[k] = b[k]; } return a; }
 function loadSettings() { try { return deepMerge(structuredClone(DEF), JSON.parse(localStorage.getItem('huapu.settings') || '{}')); } catch { return structuredClone(DEF); } }
 let SET = loadSettings();
+if (SET.nai.defaultPrompt === '人像') { SET.nai.defaultPrompt = ''; saveSettings(); }
 if (!SET.models.some(m => m.api === 'nai-diffusion-5-full')) SET.models.unshift({ match: 'V5|5-full|diffusion-5', label: 'NAI 5', api: 'nai-diffusion-5-full' });
 function saveSettings() { localStorage.setItem('huapu.settings', JSON.stringify(SET)); }
 const getPath = (o, p) => p.split('.').reduce((x, k) => x?.[k], o);
@@ -2158,15 +2159,46 @@ async function ingestFile(file) {
 async function addImages(files) {
   files = [...files].filter(f => f.type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(f.name));
   if (!files.length) return;
-  const added = [], noMeta = []; let skipped = 0;
+  const added = [], noMeta = [], cardFiles = [], imageFiles = [];
+  let skipped = 0, duplicateCards = 0, lastCard = null;
+  // 混合上传时先识别带角色卡数据的 PNG，其余图片仍按画师串导入。
+  for (const file of files) {
+    if (/\.png$/i.test(file.name) || file.type === 'image/png') {
+      try {
+        const parsed = await parseCardPNG(file);
+        if (parsed) { cardFiles.push({ file, parsed }); continue; }
+      } catch (err) {
+        toast(`${esc(file.name)} 角色卡数据读取失败：${esc(err.message)}`, 5000);
+        continue;
+      }
+    }
+    imageFiles.push(file);
+  }
+  const total = cardFiles.length + imageFiles.length;
   const t = toast('', 600000);
-  for (let i = 0; i < files.length; i++) {
-    t.innerHTML = `正在导入 ${i + 1} / ${files.length}…`;
-    try { const r = await ingestFile(files[i]); if (r.dup) { skipped++; continue; } (r.entry.prompt ? added : noMeta).push(r.entry); }
-    catch (err) { console.error(err); toast(`${esc(files[i].name)} 导入失败：${esc(err.message)}`, 5000); }
+  let step = 0;
+  for (const item of cardFiles) {
+    step++;
+    t.textContent = `正在识别混合文件 ${step} / ${total}（角色卡）…`;
+    try {
+      const result = await saveImportedCard(item.file, item.parsed);
+      if (result.duplicate) duplicateCards++;
+      else lastCard = result.card;
+    } catch (err) { toast(`${esc(item.file.name)} 角色卡导入失败：${esc(err.message)}`, 5000); }
+  }
+  for (const file of imageFiles) {
+    step++;
+    t.textContent = `正在导入图片 ${step} / ${total}…`;
+    try {
+      const r = await ingestFile(file);
+      if (r.dup) { skipped++; continue; }
+      (r.entry.prompt ? added : noMeta).push(r.entry);
+    } catch (err) { console.error(err); toast(`${esc(file.name)} 导入失败：${esc(err.message)}`, 5000); }
   }
   t.remove();
   if (skipped) toast(`${skipped} 张和库里的文件完全相同，已跳过`, 4000);
+  if (duplicateCards) toast(`${duplicateCards} 张重复角色卡，已跳过`, 4000);
+  if (lastCard) toast(`已导入 ${cardFiles.length - duplicateCards} 张角色卡`);
   if (added.length) toast(`读到 ${added.length} 张图的参数`);
   render();
   if (noMeta.length) {
@@ -2174,13 +2206,18 @@ async function addImages(files) {
       aiReady() ? [{ t: '先只存图', v: false }, { t: 'AI 识别', v: true, cls: 'pri' }] : [{ t: '知道了', v: false, cls: 'pri' }]);
     if (ok) {
       const t2 = toast('', 600000);
-      for (let i = 0; i < noMeta.length; i++) { t2.innerHTML = `AI 识别截图 ${i + 1} / ${noMeta.length}…`; try { await ocrEntry(noMeta[i]); added.push(noMeta[i]); } catch (err) { toast('识别失败：' + esc(err.message), 5000); } }
+      for (let i = 0; i < noMeta.length; i++) { t2.textContent = `AI 识别截图 ${i + 1} / ${noMeta.length}…`; try { await ocrEntry(noMeta[i]); added.push(noMeta[i]); } catch (err) { toast('识别失败：' + esc(err.message), 5000); } }
       t2.remove(); render();
     }
   }
   await classifyPending();
   await nameNewArtistGroups(added);
   await checkDups(added);
+  if (cardFiles.length) {
+    S.view = 'cards';
+    if (lastCard) { S.curCard = lastCard.id; S.cardTab = 'base'; }
+    render();
+  }
 }
 async function ocrEntry(e) {
   const blob = await getBlob(e.origId);
@@ -2551,13 +2588,31 @@ function normCardJSON(j) {
   if (data.character_book && !Array.isArray(data.character_book.entries)) data.character_book.entries = Object.values(data.character_book.entries || {});
   return { spec, data };
 }
+async function parseCardPNG(file) {
+  const ch = await pngChunks(await file.arrayBuffer());
+  const raw = ch.ccv3 || ch.chara || ch.Chara || ch.CCV3;
+  if (!raw) return null;
+  let txt; try { txt = td.decode(b64ToU8(raw)); } catch { txt = raw; }
+  return normCardJSON(JSON.parse(txt));
+}
 async function readCardFile(file) {
   if (/\.json$/i.test(file.name) || file.type === 'application/json') return { ...normCardJSON(JSON.parse(await file.text())), img: null };
-  const buf = await file.arrayBuffer(); const ch = await pngChunks(buf);
-  const raw = ch.ccv3 || ch.chara || ch.Chara || ch.CCV3;
-  if (!raw) throw new Error('这张 PNG 里没有角色卡数据');
-  let txt; try { txt = td.decode(b64ToU8(raw)); } catch { txt = raw; }
-  return { ...normCardJSON(JSON.parse(txt)), img: file };
+  const parsed = await parseCardPNG(file);
+  if (!parsed) throw new Error('这张 PNG 里没有角色卡数据');
+  return { ...parsed, img: file };
+}
+function stableCardJSON(value) {
+  if (Array.isArray(value)) return '[' + value.map(stableCardJSON).join(',') + ']';
+  if (value && typeof value === 'object') return '{' + Object.keys(value).sort().map(k => JSON.stringify(k) + ':' + stableCardJSON(value[k])).join(',') + '}';
+  return JSON.stringify(value);
+}
+async function saveImportedCard(file, parsed) {
+  const fingerprint = stableCardJSON(parsed.data);
+  if (S.cards.some(c => stableCardJSON(c.data) === fingerprint)) return { duplicate: true, card: null };
+  const c = { id: uid(), createdAt: now(), spec: parsed.spec, data: parsed.data, src: file.name };
+  if (parsed.img !== false && file) await setCardImage(c, file);
+  await putCard(c);
+  return { duplicate: false, card: c };
 }
 async function setCardImage(c, blob) {
   const th = await makeThumb(blob, 512);
@@ -2567,16 +2622,19 @@ async function setCardImage(c, blob) {
   for (const b of old) if (b) { urlCache.delete(b); if (!blobRefd(b)) await DB.del('blobs', b); }
 }
 async function importCards(files) {
-  let n = 0, last = null;
+  let n = 0, dup = 0, last = null;
   for (const f of files) {
     try {
       const r = await readCardFile(f);
-      const c = { id: uid(), createdAt: now(), spec: r.spec, data: r.data, src: f.name };
-      if (r.img) await setCardImage(c, r.img);
-      await putCard(c); n++; last = c;
+      const result = await saveImportedCard(f, r);
+      if (result.duplicate) { dup++; continue; }
+      n++; last = result.card;
     } catch (err) { toast(`${esc(f.name)}：${esc(err.message)}`, 5000); }
   }
-  if (n) { toast(`导入了 ${n} 张角色卡`); S.view = 'cards'; S.curCard = last.id; S.cardTab = 'base'; render(); }
+  if (n || dup) {
+    toast(`导入 ${n} 张角色卡，跳过重复 ${dup} 张`);
+    S.view = 'cards'; if (last) { S.curCard = last.id; S.cardTab = 'base'; } render();
+  }
 }
 function blankCard() {
   return { id: uid(), createdAt: now(), spec: 'chara_card_v2', data: normCardJSON({ name: '新角色' }).data };
