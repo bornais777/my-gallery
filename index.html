@@ -3343,7 +3343,7 @@ function boardField(t) {
     if (f === 'name') $$(`.mchip[data-k="${i}"]`).forEach(x => x.textContent = t.value);
   } else if (t.dataset.bs) {
     const [sid, f] = t.dataset.bs.split(':'); const s = b.shots.find(x => x.id === sid); if (!s) return true;
-    if (f.startsWith('act')) (s.actions ||= {})[f.slice(3)] = t.value; else s[f] = t.type === 'checkbox' ? t.checked : t.type === 'number' ? (t.value === '' ? null : +t.value) : t.value;
+    if (f.startsWith('act')) (s.actions ||= {})[f.slice(3)] = t.value; else s[f] = t.type === 'checkbox' ? t.checked : (t.type === 'number' || f === 'ucPreset') ? (t.value === '' ? null : +t.value) : t.value;
     if (f === 'orientation') { const m = $(`.shot[data-sid="${s.id}"] .smedia`); if (m) m.style.aspectRatio = SIZES[s.orientation].replace('x', '/'); }
     refreshFinalPrompt(b, s);
   } else return false;
