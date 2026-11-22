@@ -646,7 +646,7 @@ const fmtTime = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.ge
 /* ================= 设置（只存本机，不同步） ================= */
 const DEF = {
   text: { provider: 'openai', base: '', key: '', model: '', visionModel: '' },
-  gpt: { mode: 'images', base: '', key: '', model: 'gpt-image-1', size: '1024x1536' },
+  gpt: { mode: 'images', base: '', key: '', model: 'gpt-image-1', chamiModel: 'gpt-image-2', size: '1024x1536' },
   nai: { mode: 'chami', base: 'http://chami.yyqzx.com', key: '', model: 'nai-diffusion-4-5-full', size: '832x1216', steps: 28, scale: 3.5, cfgRescale: 0, ucPreset: 2, noiseSchedule: 'karras', qualityToggle: false, sampler: 'k_euler_ancestral', neg: 'lowres, artistic error, worst quality, bad quality, jpeg artifacts, very displeasing, watermark, signature, text', quality: 'best quality, amazing quality, very aesthetic, absurdres', defaultPrompt: '' },
   userName: 'User',
   models: [
@@ -1189,7 +1189,7 @@ async function genGPT({ prompt, size }) {
       r = await fetch(base + '/GPTimage/chami/v1/chat/completions', {
         method: 'POST',
         headers: hdr(g.key),
-        body: JSON.stringify({ model: g.model || 'gpt-image-2', messages: [{ role: 'user', content: prompt }], size: size || g.size || '1024x1024', stream: true }),
+        body: JSON.stringify({ model: g.chamiModel || 'gpt-image-2', messages: [{ role: 'user', content: prompt }], size: size || g.size || '1024x1024', stream: true }),
         signal: ctrl.signal,
       });
       raw = await r.text();
@@ -1217,8 +1217,7 @@ async function genGPT({ prompt, size }) {
     if (streamError) throw new Error('茶蘼 GPT 返回错误：' + streamError + '（不要自动重试）');
     let found = findImageInText(content);
     if (!found) {
-      const md = content.match(/!\\[[^\\]]*\\]\\((https?:\\/\\/[^)\\s]+)\\)/);
-      if (md) found = md[1];
+
     }
     if (!found) throw new Error('茶蘼 GPT 返回 HTTP 200，但没有解析到图片；请查看控制台返回内容，不要自动重试。');
     return await toImage(found);
@@ -2010,8 +2009,8 @@ function renderSettings(main) {
      ${sel('gpt.mode', '接口格式', [['images', 'images/generations'], ['chat', 'chat/completions（回复里带图）'], ['chami', '茶蘼 GPT（SSE 流式）']])}
      ${fld('gpt.base', '接口地址 / 域名', '茶蘼默认 http://chami.yyqzx.com；CF 后填你的 HTTPS 域名（只填域名）')}
      ${fld('gpt.key', 'GPT 线单个 API Key（不要用 NAI 组合 Key）', '', 'password')}
-     <label class="field"><span>模型名</span><input data-set="gpt.model" list="gptModelList" value="${esc(SET.gpt.model || '')}" placeholder="gpt-image-2"></label>
-     <datalist id="gptModelList"><option value="gpt-image-2"></option><option value="gpt-image-2.5"></option></datalist>
+     ${fld('gpt.model', '通用 GPT 模型名', 'gpt-image-1')}
+     <label class="field"><span>茶蘼 GPT 模型</span><select data-set="gpt.chamiModel"><option value="gpt-image-2" ${(SET.gpt.chamiModel || 'gpt-image-2') === 'gpt-image-2' ? 'selected' : ''}>gpt-image-2</option><option value="gpt-image-2.5" ${SET.gpt.chamiModel === 'gpt-image-2.5' ? 'selected' : ''}>gpt-image-2.5</option></select></label>
      <p class="muted sm">茶蘼 GPT 使用 /GPTimage/chami/v1/chat/completions，必须 stream=true；模型可选 gpt-image-2 或 gpt-image-2.5。错误不会自动重试。</p>
      ${sel('gpt.size', '尺寸', [['1024x1536', '1024×1536 竖'], ['1536x1024', '1536×1024 横'], ['1024x1024', '1024×1024 方']])}
    </section>
