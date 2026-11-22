@@ -2160,13 +2160,13 @@ async function addImages(files) {
   files = [...files].filter(f => f.type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(f.name));
   if (!files.length) return;
   const added = [], noMeta = [], cardFiles = [], imageFiles = [];
-  let skipped = 0, duplicateCards = 0, lastCard = null;
+  let skipped = 0, duplicateCards = 0, importedCards = 0, lastCard = null;
   // 混合上传时先识别带角色卡数据的 PNG，其余图片仍按画师串导入。
   for (const file of files) {
     if (/\.png$/i.test(file.name) || file.type === 'image/png') {
       try {
         const parsed = await parseCardPNG(file);
-        if (parsed) { cardFiles.push({ file, parsed }); continue; }
+        if (parsed) { cardFiles.push({ file, parsed: { ...parsed, img: file } }); continue; }
       } catch (err) {
         toast(`${esc(file.name)} 角色卡数据读取失败：${esc(err.message)}`, 5000);
         continue;
@@ -2183,7 +2183,7 @@ async function addImages(files) {
     try {
       const result = await saveImportedCard(item.file, item.parsed);
       if (result.duplicate) duplicateCards++;
-      else lastCard = result.card;
+      else { importedCards++; lastCard = result.card; }
     } catch (err) { toast(`${esc(item.file.name)} 角色卡导入失败：${esc(err.message)}`, 5000); }
   }
   for (const file of imageFiles) {
@@ -2198,7 +2198,7 @@ async function addImages(files) {
   t.remove();
   if (skipped) toast(`${skipped} 张和库里的文件完全相同，已跳过`, 4000);
   if (duplicateCards) toast(`${duplicateCards} 张重复角色卡，已跳过`, 4000);
-  if (lastCard) toast(`已导入 ${cardFiles.length - duplicateCards} 张角色卡`);
+  if (importedCards) toast(`已导入 ${importedCards} 张角色卡`);
   if (added.length) toast(`读到 ${added.length} 张图的参数`);
   render();
   if (noMeta.length) {
@@ -2610,7 +2610,7 @@ async function saveImportedCard(file, parsed) {
   const fingerprint = stableCardJSON(parsed.data);
   if (S.cards.some(c => stableCardJSON(c.data) === fingerprint)) return { duplicate: true, card: null };
   const c = { id: uid(), createdAt: now(), spec: parsed.spec, data: parsed.data, src: file.name };
-  if (parsed.img !== false && file) await setCardImage(c, file);
+  if (parsed.img) await setCardImage(c, parsed.img);
   await putCard(c);
   return { duplicate: false, card: c };
 }
