@@ -3053,8 +3053,9 @@ function shotPrompt(b, s) {
   const setting = s.useSetting === false ? [] : splitTags(b.setting);
   const tail = [...shot, ...setting, ...splitTags(b.quality)];
   const head = splitTags(b.artist);
-  const multi = chars.length > 1 && b.multiCharacter !== false;
-  const positions = chars.map(c => c.posX == null && c.posY == null ? null : { x: c.posX ?? 0.5, y: c.posY ?? 0.5 });
+  const multi = chars.length > 1 && (s.multiCharacter ?? (b.multiCharacter !== false));
+  const positionLines = String(s.positions || '').split(/\n+/);
+  const positions = chars.map((c, i) => { const v = (positionLines[i] || '').split(',').map(Number); if (v.length === 2 && v.every(Number.isFinite)) return { x: clamp(v[0],0,1), y: clamp(v[1],0,1) }; return c.posX == null && c.posY == null ? null : { x: c.posX ?? 0.5, y: c.posY ?? 0.5 }; });
   if (multi) {
     const capts = chars.map(c => { const { g, rest } = splitGender(splitTags(c.tags)); const act = conflictFilter(splitTags(s.actions?.[b.characters.indexOf(c)]), rest); return dedupe([g, ...rest, ...act]).join(', '); });
     return { prompt: dedupe([...head, ...countTags(chars), ...tail]).join(', '), chars: capts, charPositions: positions, size: SIZES[s.orientation] || SIZES.portrait };
@@ -3149,7 +3150,7 @@ async function startQueue(b, onlyIds) {
       let ok = false;
       for (let attempt = 0; attempt < 2 && !ok; attempt++) {
         try {
-          const r = await genNAI({ prompt: pr.prompt, chars: pr.chars, charPositions: pr.charPositions, multiCharacter: b.multiCharacter !== false, negative: b.negative, model: b.model || SET.nai.model, size: pr.size, seed: b.fixedSeed ? b.seed : null, steps: b.steps, scale: b.scale, cfgRescale: b.cfgRescale, sampler: b.sampler, noiseSchedule: b.noiseSchedule, ucPreset: b.ucPreset, qualityToggle: b.qualityToggle, vibes });
+          const r = await genNAI({ prompt: pr.prompt, chars: pr.chars, charPositions: pr.charPositions, multiCharacter: s.multiCharacter ?? (b.multiCharacter !== false), negative: b.negative, model: s.model || b.model || SET.nai.model, size: pr.size, seed: s.seed ?? (b.fixedSeed ? b.seed : null), steps: s.steps ?? b.steps, scale: s.scale ?? b.scale, cfgRescale: s.cfgRescale ?? b.cfgRescale, sampler: s.sampler || b.sampler, noiseSchedule: s.noiseSchedule || b.noiseSchedule, ucPreset: s.ucPreset ?? b.ucPreset, qualityToggle: s.qualityToggle ?? b.qualityToggle, vibes });
           const th = await makeThumb(r.blob);
           for (const id of [s.imgId, s.thumbId]) if (id) urlCache.delete(id);
           const old = [s.imgId, s.thumbId];
@@ -3262,6 +3263,13 @@ function shotHTML(b, s, i) {
       ${b.characters.length ? `<div class="schars">${b.characters.map((c, k) => `<button class="mchip ${(s.chars || []).includes(k) ? 'on' : ''}" data-act="bd-shot-char" data-sid="${s.id}" data-k="${k}">${esc(c.name)}</button>`).join('')}</div>` : ''}
       <label class="field"><span>镜头标签</span><textarea class="auto mono" rows="2" data-bs="${s.id}:tags">${esc(s.tags)}</textarea></label>
       ${(s.chars || []).map(k => b.characters[k] ? `<label class="field"><span>${esc(b.characters[k].name)} 的动作表情</span><textarea class="auto mono" rows="1" data-bs="${s.id}:act${k}">${esc(s.actions?.[k] || '')}</textarea></label>` : '').join('')}
+      <details class="gparams"><summary>本镜头参数（默认继承分镜设置，可单独覆盖）</summary>
+        <div class="f3"><label class="field"><span>Steps</span><input type="number" min="1" max="50" data-bs="${s.id}:steps" value="${s.steps ?? b.steps ?? SET.nai.steps}"></label><label class="field"><span>CFG / Scale</span><input type="number" step="0.1" data-bs="${s.id}:scale" value="${s.scale ?? b.scale ?? SET.nai.scale}"></label><label class="field"><span>CFG Rescale</span><input type="number" min="0" max="1" step="0.05" data-bs="${s.id}:cfgRescale" value="${s.cfgRescale ?? b.cfgRescale ?? SET.nai.cfgRescale ?? 0}"></label></div>
+        <div class="f3"><label class="field"><span>模型</span><select data-bs="${s.id}:model">${SET.models.filter(x => /^nai-/.test(x.api)).map(x => `<option value="${esc(x.api)}" ${(s.model ?? b.model ?? SET.nai.model)===x.api?'selected':''}>${esc(x.label)}</option>`).join('')}</select></label><label class="field"><span>采样器</span><select data-bs="${s.id}:sampler"><option value="k_euler_ancestral" ${(s.sampler ?? b.sampler ?? SET.nai.sampler)==='k_euler_ancestral'?'selected':''}>Euler Ancestral</option><option value="k_euler" ${(s.sampler ?? b.sampler)==='k_euler'?'selected':''}>Euler</option><option value="k_dpmpp_2s_ancestral" ${(s.sampler ?? b.sampler)==='k_dpmpp_2s_ancestral'?'selected':''}>DPM++ 2S Ancestral</option><option value="k_dpmpp_2m" ${(s.sampler ?? b.sampler)==='k_dpmpp_2m'?'selected':''}>DPM++ 2M</option><option value="k_dpmpp_sde" ${(s.sampler ?? b.sampler)==='k_dpmpp_sde'?'selected':''}>DPM++ SDE</option></select></label><label class="field"><span>噪声调度</span><select data-bs="${s.id}:noiseSchedule"><option value="karras" ${(s.noiseSchedule ?? b.noiseSchedule ?? SET.nai.noiseSchedule)==='karras'?'selected':''}>Karras</option><option value="exponential" ${(s.noiseSchedule ?? b.noiseSchedule)==='exponential'?'selected':''}>Exponential</option><option value="polyexponential" ${(s.noiseSchedule ?? b.noiseSchedule)==='polyexponential'?'selected':''}>Polyexponential</option></select></label></div>
+        <div class="f3"><label class="field"><span>UC 预设</span><select data-bs="${s.id}:ucPreset"><option value="0" ${(s.ucPreset ?? b.ucPreset)===0?'selected':''}>Heavy</option><option value="1" ${(s.ucPreset ?? b.ucPreset)===1?'selected':''}>Light</option><option value="2" ${(s.ucPreset ?? b.ucPreset)===2?'selected':''}>Furry focus</option><option value="3" ${(s.ucPreset ?? b.ucPreset)===3?'selected':''}>Human focus</option><option value="4" ${(s.ucPreset ?? b.ucPreset)===4?'selected':''}>None</option></select></label><label class="field"><span>Seed（留空随机）</span><input type="number" data-bs="${s.id}:seed" value="${s.seed ?? ''}"></label><label class="check"><input type="checkbox" data-bs="${s.id}:qualityToggle" ${(s.qualityToggle ?? b.qualityToggle) !== false ? 'checked' : ''}>质量词开关</label></div>
+        <label class="check"><input type="checkbox" data-bs="${s.id}:multiCharacter" ${(s.multiCharacter ?? b.multiCharacter) !== false ? 'checked' : ''}>多角色分离提示词</label>
+        <label class="field"><span>本镜头角色位置（按本镜头角色顺序，每行 x,y；留空继承角色位置）</span><textarea class="auto mono" rows="2" data-bs="${s.id}:positions" placeholder="0.3,0.5&#10;0.7,0.5">${esc(s.positions || '')}</textarea></label>
+      </details>
       <details class="fprompt"><summary>最终提示词${pr.chars ? '（多角色分开写）' : ''}</summary><p class="ptxt sm mono">${esc(pr.prompt)}</p>${pr.chars ? pr.chars.map((c, k) => `<p class="ptxt sm mono"><b>角色 ${k + 1}：</b>${esc(c)}</p>`).join('') : ''}</details>
       <div class="sact"><button class="btn xs" data-act="bd-shot-run" data-sid="${s.id}">${ic('wand', 12)}${s.imgId ? '重画' : '只画这张'}</button>
       ${s.imgId ? `<button class="btn xs" data-act="bd-shot-save" data-sid="${s.id}" ${s.savedId ? 'disabled' : ''}>${s.savedId ? '已存' : `${ic('folder', 12)}存进画谱`}</button><button class="btn xs ghost" data-act="bd-shot-dl" data-sid="${s.id}">${ic('download', 12)}</button>` : ''}
@@ -3335,7 +3343,7 @@ function boardField(t) {
     if (f === 'name') $$(`.mchip[data-k="${i}"]`).forEach(x => x.textContent = t.value);
   } else if (t.dataset.bs) {
     const [sid, f] = t.dataset.bs.split(':'); const s = b.shots.find(x => x.id === sid); if (!s) return true;
-    if (f.startsWith('act')) (s.actions ||= {})[f.slice(3)] = t.value; else s[f] = t.value;
+    if (f.startsWith('act')) (s.actions ||= {})[f.slice(3)] = t.value; else s[f] = t.type === 'checkbox' ? t.checked : t.type === 'number' ? (t.value === '' ? null : +t.value) : t.value;
     if (f === 'orientation') { const m = $(`.shot[data-sid="${s.id}"] .smedia`); if (m) m.style.aspectRatio = SIZES[s.orientation].replace('x', '/'); }
     refreshFinalPrompt(b, s);
   } else return false;
