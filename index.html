@@ -585,6 +585,7 @@ body[data-view=cards] .fab,body[data-view=story] .fab,body[data-view=settings] .
 
 .tag-classify-list{max-height:62vh;overflow:auto;display:flex;flex-direction:column;gap:7px;padding:8px 2px}.tag-classify-list .row-inline{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 8px;border-bottom:1px solid var(--line)}.tag-classify-list .row-inline span{min-width:0;overflow-wrap:anywhere}.tag-classify-list select{min-width:112px}
 .style-name-list{max-height:60vh;overflow:auto;display:flex;flex-direction:column;gap:7px}.style-name-row{display:flex;align-items:center;gap:8px;padding:9px 4px;border-bottom:1px solid var(--line)}.style-name-row>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}.style-name-row small{color:var(--muted);overflow-wrap:anywhere}
+.hero-actions{display:flex;justify-content:center;gap:8px;margin-top:10px;flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -1551,7 +1552,7 @@ function renderHome(main) {
   const has = new Set(rows.map(r => (r.sort[0] || '').toUpperCase()));
   main.innerHTML = `<div class="home">
     <div class="hero"><h1>画谱</h1><p>${rows.length} 组画师 · ${S.entries.length} 条串 · ${S.vibes.length} 个 vibe</p>
-      <div class="search hero-search glass">${ic('search')}<input id="homeSearch" placeholder="输入画师名或画风名，牌会转过去" autocomplete="off"></div></div>
+      <div class="search hero-search glass">${ic('search')}<input id="homeSearch" placeholder="输入画师名或画风名，牌会转过去" autocomplete="off"></div><div class="hero-actions"><button class="btn" data-act="style-names">画风命名 / 管理</button><button class="btn pri" data-act="style-batch">AI 批量命名</button></div></div>
     <div class="fan" id="fan" style="--fw:${fanW()}px">${rows.map((r, i) => fanCard(r, i)).join('')}</div>
     <div class="fan-ctrl"><button class="btn icon-btn" data-act="fan-step" data-d="-1" aria-label="上一张">${ic('chev')}</button><span id="fanPos"></span><button class="btn icon-btn" data-act="fan-step" data-d="1" aria-label="下一张">${ic('chev')}</button></div>
     <div class="az glass">${letters.map(l => `<button data-act="az" data-l="${l}" ${has.has(l) ? '' : 'disabled'}>${l}</button>`).join('')}<button data-act="az" data-l="#">#</button></div>
@@ -1560,9 +1561,9 @@ function renderHome(main) {
   bindFan(); updateFan();
 }
 function fanCard(r, i) {
-  const c = coverOf(r);
+  const c = coverOf(r); const label = S.meta.artistNames?.[r.key] || r.names.join(' · ') || '未命名画风';
   return `<div class="fcard" data-i="${i}">${c ? `<img data-blob="${c.thumbId}" alt="" draggable="false">` : `<div class="noimg-f"><span>${esc(r.names[0] || '无画师')}</span></div>`}
-  <div class="lab"><b>${esc(r.names.join(' · ') || '无画师')}</b><span>${r.items.length}</span></div></div>`;
+  <div class="lab"><b>${esc(label)}</b><span>${r.items.length}</span></div></div>`;
 }
 let fanRAF = 0;
 function updateFan() {
