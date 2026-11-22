@@ -1108,7 +1108,7 @@ function genNAI(args) {
   return run;
 }
 
-async function genNAIRequest({ prompt, negative, model, size, seed, steps, scale, sampler, vibes, chars, charPositions, cfgRescale, ucPreset, noiseSchedule, qualityToggle, multiCharacter = true, useCoords = true }) {
+async function genNAIRequest({ prompt, negative, model, size, seed, steps, scale, sampler, vibes, chars, charPositions, cfgRescale, ucPreset, noiseSchedule, qualityToggle, multiCharacter = true, useCoords = null }) {
   const n = SET.nai;
   if (!n.key) throw new Error('先在设置里填 Chami 的组合 API Key（用户 API Key + 内部 NAI Key）');
   const [w, h] = (size || n.size).split('x').map(Number);
@@ -1120,6 +1120,7 @@ async function genNAIRequest({ prompt, negative, model, size, seed, steps, scale
   const extraSeed = seed == null || Number(seed) < 0
     ? Math.floor(Math.random() * 2147483647)
     : sd;
+  const coordsEnabled = useCoords == null ? !!(charPositions || []).some(Boolean) : !!useCoords;
   const params = {
     params_version: isV5 ? 4 : 3,
     width: w,
@@ -1131,7 +1132,7 @@ async function genNAIRequest({ prompt, negative, model, size, seed, steps, scale
     ucPreset: ucPreset ?? n.ucPreset ?? 2,
     qualityToggle: qualityToggle ?? n.qualityToggle ?? true,
     dynamic_thresholding: !isV5,
-    use_coords: true,
+    use_coords: coordsEnabled,
     skip_cfg_above_sigma: isV5 ? 19 : 58,
     controlnet_strength: 1,
     legacy: false,
@@ -1142,8 +1143,8 @@ async function genNAIRequest({ prompt, negative, model, size, seed, steps, scale
     extra_noise_seed: extraSeed,
     negative_prompt: neg,
     v4_prompt: {
-      caption: { base_caption: prompt, char_captions: multiCharacter ? (chars || []).map((char, i) => { const p = charPositions?.[i]; return { char_caption: char, ...(p && Number.isFinite(+p.x) && Number.isFinite(+p.y) ? { centers: [{ x: +p.x, y: +p.y }] } : {}) }; }) : [] },
-      use_coords: !!useCoords,
+      caption: { base_caption: prompt, char_captions: multiCharacter ? (chars || []).map((char, i) => { const p = charPositions?.[i]; return { char_caption: char, centers: [{ x: p && Number.isFinite(+p.x) ? +p.x : 0.5, y: p && Number.isFinite(+p.y) ? +p.y : 0.5 }] }; }) : [] },
+      use_coords: coordsEnabled,
       use_order: true,
     },
     v4_negative_prompt: {
@@ -3051,7 +3052,7 @@ function shotPrompt(b, s) {
   const tail = [...shot, ...setting, ...splitTags(b.quality)];
   const head = splitTags(b.artist);
   const multi = chars.length > 1 && b.multiCharacter !== false;
-  const positions = chars.map(c => c.posX == null || c.posY == null ? null : { x: c.posX, y: c.posY });
+  const positions = chars.map(c => c.posX == null && c.posY == null ? null : { x: c.posX ?? 0.5, y: c.posY ?? 0.5 });
   if (multi) {
     const capts = chars.map(c => { const { g, rest } = splitGender(splitTags(c.tags)); const act = conflictFilter(splitTags(s.actions?.[b.characters.indexOf(c)]), rest); return dedupe([g, ...rest, ...act]).join(', '); });
     return { prompt: dedupe([...head, ...countTags(chars), ...tail]).join(', '), chars: capts, charPositions: positions, size: SIZES[s.orientation] || SIZES.portrait };
