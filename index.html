@@ -1823,6 +1823,8 @@ function renderSettings(main) {
      ${sel('nai.model', '默认模型', SET.models.map(m => [m.api, `${m.label}（${m.api}）`]))}
      <div class="f3">${sel('nai.size', '尺寸', [['832x1216', '832×1216 竖'], ['1216x832', '1216×832 横'], ['1024x1024', '1024×1024 方']])}${fld('nai.steps', 'Steps', '28', 'number')}${fld('nai.scale', 'Scale', '3.5', 'number', 'step="0.1"')}</div>
      ${sel('nai.sampler', '采样器', [['k_euler_ancestral', 'Euler Ancestral'], ['k_euler', 'Euler'], ['k_dpmpp_2s_ancestral', 'DPM++ 2S Ancestral'], ['k_dpmpp_2m_sde', 'DPM++ 2M SDE'], ['k_dpmpp_2m', 'DPM++ 2M'], ['k_dpmpp_sde', 'DPM++ SDE']])}
+     <div class="f3">${fld('nai.cfgRescale', 'CFG Rescale（0–1）', '0', 'number', 'min="0" max="1" step="0.05"')}${fld('nai.ucPreset', 'UC 预设（0–4）', '2', 'number', 'min="0" max="4" step="1"')}${sel('nai.noiseSchedule', '噪声调度', [['karras','Karras'],['exponential','Exponential'],['polyexponential','Polyexponential']])}</div>
+     <label class="check"><input type="checkbox" data-set="nai.qualityToggle" ${SET.nai.qualityToggle !== false ? 'checked' : ''}> 默认启用质量词</label>
      <label class="field"><span>默认质量词（分镜和封面会加在末尾）</span><textarea rows="2" data-set="nai.quality">${esc(SET.nai.quality)}</textarea></label>
      <label class="field"><span>默认负面（分镜和封面用）</span><textarea rows="3" data-set="nai.neg">${esc(SET.nai.neg)}</textarea></label>
    </section>
@@ -2783,7 +2785,7 @@ function coverModal(c) {
       <label class="field"><span>画师 / 风格标签</span><input id="cvArt" placeholder="artist:xxx, 1.2::artist:yyy::"></label>
       <label class="field"><span>角色外观与构图 <button class="btn xs" id="cvAI">${ic('wand', 12)}AI 根据描述写</button></span><textarea id="cvP" rows="6" placeholder="1girl, silver hair, red eyes, …, upper body, looking at viewer"></textarea></label>
       <label class="field"><span>负面</span><textarea id="cvN" rows="2">${esc(SET.nai.neg)}</textarea></label>
-      <div class="f2"><label class="field"><span>尺寸</span><select id="cvSize"><option value="832x1216">832×1216 竖</option><option value="1024x1024">1024×1024 方</option><option value="1216x832">1216×832 横</option></select></label>
+      <div class="f2"><label class="field"><span>配图尺寸</span><input value="832×1216（固定竖版）" disabled></label>
       <label class="field"><span>模型</span><select id="cvM">${SET.models.filter(x => /^nai-/.test(x.api)).map(x => `<option value="${esc(x.api)}" ${x.api === SET.nai.model ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select></label></div>
       <label class="check"><input type="checkbox" id="cvSave"> 同时存进画谱</label>
     </div>
@@ -2803,7 +2805,7 @@ function coverModal(c) {
     if (!$('#cvP', m).value.trim()) return toast('先写外观，或点"AI 根据描述写"');
     const b = ev.currentTarget, msg = $('#cvMsg', m); b.disabled = true; b.classList.add('loading'); msg.textContent = '生成中…';
     try {
-      const r = await genNAI({ prompt: P(), negative: $('#cvN', m).value.trim(), model: $('#cvM', m).value, size: $('#cvSize', m).value });
+      const r = await genNAI({ prompt: P(), negative: $('#cvN', m).value.trim(), model: $('#cvM', m).value, size: '832x1216', cfgRescale: SET.nai.cfgRescale, ucPreset: SET.nai.ucPreset, noiseSchedule: SET.nai.noiseSchedule, qualityToggle: SET.nai.qualityToggle });
       st.blob = r.blob; st.seed = r.seed;
       $('#cvImg', m).innerHTML = `<img src="${URL.createObjectURL(r.blob)}" class="ld" alt="">`;
       $('#cvSet', m).disabled = false; msg.textContent = '满意就点"设为封面"，不满意再点生成';
