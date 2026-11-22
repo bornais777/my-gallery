@@ -644,7 +644,7 @@ const fmtTime = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.ge
 const DEF = {
   text: { provider: 'openai', base: '', key: '', model: '', visionModel: '' },
   gpt: { mode: 'images', base: '', key: '', model: 'gpt-image-1', size: '1024x1536' },
-  nai: { mode: 'chami', base: 'http://chami.yyqzx.com', key: '', model: 'nai-diffusion-4-5-full', size: '832x1216', steps: 28, scale: 3.5, sampler: 'k_euler_ancestral', neg: 'lowres, artistic error, worst quality, bad quality, jpeg artifacts, very displeasing, watermark, signature, text', quality: 'best quality, amazing quality, very aesthetic, absurdres', defaultPrompt: '人像' },
+  nai: { mode: 'chami', base: 'http://chami.yyqzx.com', key: '', model: 'nai-diffusion-4-5-full', size: '832x1216', steps: 28, scale: 3.5, cfgRescale: 0, ucPreset: 2, noiseSchedule: 'karras', qualityToggle: true, sampler: 'k_euler_ancestral', neg: 'lowres, artistic error, worst quality, bad quality, jpeg artifacts, very displeasing, watermark, signature, text', quality: 'best quality, amazing quality, very aesthetic, absurdres', defaultPrompt: '人像' },
   userName: 'User',
   models: [
     { match: 'V5|5-full|diffusion-5', label: 'V5', api: 'nai-diffusion-5-full' },
@@ -1083,7 +1083,7 @@ function genNAI(args) {
   return run;
 }
 
-async function genNAIRequest({ prompt, negative, model, size, seed, steps, scale, sampler, vibes, chars }) {
+async function genNAIRequest({ prompt, negative, model, size, seed, steps, scale, sampler, vibes, chars, charPositions, cfgRescale, ucPreset, noiseSchedule, qualityToggle, multiCharacter = true, useCoords = true }) {
   const n = SET.nai;
   if (!n.key) throw new Error('先在设置里填 Chami 的组合 API Key（用户 API Key + 内部 NAI Key）');
   const [w, h] = (size || n.size).split('x').map(Number);
@@ -1100,25 +1100,25 @@ async function genNAIRequest({ prompt, negative, model, size, seed, steps, scale
     width: w,
     height: h,
     scale: scale ?? (n.scale ?? (isV5 ? 5 : 3.5)),
-    sampler: sampler || 'k_euler_ancestral',
+    sampler: sampler || n.sampler || 'k_euler_ancestral',
     steps: steps ?? n.steps,
     n_samples: 1,
-    ucPreset: 2,
-    qualityToggle: true,
+    ucPreset: ucPreset ?? n.ucPreset ?? 2,
+    qualityToggle: qualityToggle ?? n.qualityToggle ?? true,
     dynamic_thresholding: !isV5,
     use_coords: true,
     skip_cfg_above_sigma: isV5 ? 19 : 58,
     controlnet_strength: 1,
     legacy: false,
     add_original_image: true,
-    cfg_rescale: 0,
-    noise_schedule: 'karras',
+    cfg_rescale: cfgRescale ?? n.cfgRescale ?? 0,
+    noise_schedule: noiseSchedule || n.noiseSchedule || 'karras',
     seed: sd,
     extra_noise_seed: extraSeed,
     negative_prompt: neg,
     v4_prompt: {
-      caption: { base_caption: prompt, char_captions: (chars || []).map(char => ({ char_caption: char })) },
-      use_coords: true,
+      caption: { base_caption: prompt, char_captions: multiCharacter ? (chars || []).map((char, i) => { const p = charPositions?.[i]; return { char_caption: char, ...(p && Number.isFinite(+p.x) && Number.isFinite(+p.y) ? { centers: [{ x: +p.x, y: +p.y }] } : {}) }; }) : [] },
+      use_coords: !!useCoords,
       use_order: true,
     },
     v4_negative_prompt: {
@@ -2371,7 +2371,7 @@ async function init() {
   try { await DB.open(); } catch (err) { $('#main').innerHTML = emptyState('浏览器不允许本地存储', esc(err.message)); return; }
   S.entries = await DB.all('entries'); S.vibes = await DB.all('vibes'); S.folders = await DB.all('folders');
   S.tags = await DB.kvGet('tags', {});
-  S.meta = Object.assign({ baseOverride: {}, keepPairs: [], tombstones: {} }, await DB.kvGet('meta', {}));
+  S.meta = Object.assign({ baseOverride: {}, keepPairs: [], tombstones: {}, artistNames: {} }, await DB.kvGet('meta', {})); S.meta.artistNames ||= {};
   S.blobIndex = await DB.kvGet('blobIndex', {});
   S.cards = await DB.all('cards'); S.boards = await DB.all('boards');
   for (const b of S.boards) for (const s of b.shots || []) if (s.status === 'run') s.status = 'pending';
