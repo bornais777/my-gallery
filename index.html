@@ -660,6 +660,7 @@ const DEF = {
 function deepMerge(a, b) { for (const k in b) { if (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k]) && a[k] && typeof a[k] === 'object' && !Array.isArray(a[k])) deepMerge(a[k], b[k]); else a[k] = b[k]; } return a; }
 function loadSettings() { try { return deepMerge(structuredClone(DEF), JSON.parse(localStorage.getItem('huapu.settings') || '{}')); } catch { return structuredClone(DEF); } }
 let SET = loadSettings();
+if (!SET.models.some(m => m.api === 'nai-diffusion-5-full')) SET.models.unshift({ match: 'V5|5-full|diffusion-5', label: 'NAI 5', api: 'nai-diffusion-5-full' });
 function saveSettings() { localStorage.setItem('huapu.settings', JSON.stringify(SET)); }
 const getPath = (o, p) => p.split('.').reduce((x, k) => x?.[k], o);
 function setPath(o, p, v) { const ks = p.split('.'); let x = o; ks.slice(0, -1).forEach(k => x = x[k]); x[ks.at(-1)] = v; }
@@ -1811,9 +1812,10 @@ function renderSettings(main) {
      ${sel('text.provider', '接口类型', [['openai', 'OpenAI 兼容 / 中转站'], ['gemini', 'Gemini'], ['deepseek', 'DeepSeek']])}
      ${fld('text.base', '接口地址', tph[0])}
      ${fld('text.key', 'Key', '', 'password')}
-     ${fld('text.model', '模型名', tph[1])}
+     <label class="field"><span>模型名</span><input id="textModelInput" data-set="text.model" list="textModelList" value="${esc(t.model || tph[1])}" placeholder="先拉取模型，或手动输入"></label>
+     <datalist id="textModelList">${(t.modelOptions || []).map(x => `<option value="${esc(x)}"></option>`).join('')}</datalist>
      ${fld('text.visionModel', '看图模型（识别截图用，留空用上面的）', t.provider === 'deepseek' ? 'DeepSeek 不能看图，截图识别请换接口' : '例如 gpt-4o / gemini-2.5-flash')}
-     <div class="srow"><button class="btn" data-act="test-text">测试连接</button></div>
+     <div class="srow"><button class="btn" data-act="pull-text-models">拉取模型列表</button><button class="btn" data-act="test-text">测试连接</button><span class="muted sm">拉取失败时仍可手动输入模型名</span></div>
    </section>
    <section class="scard glass"><h3>${ic('wand')}NAI 生图</h3>
      ${fld('nai.base', 'Chami 接口地址', '默认 http://chami.yyqzx.com；自动拼接 /image/chami')}
@@ -2252,6 +2254,35 @@ const ACT = {
   'scan-dups': () => { S.dupPairs = scanDups(); render(); },
   'dup-open': el => { const p = S.dupPairs?.[+el.dataset.i]; if (p) dupModal(p[0], p[1]); },
 
+  'pull-text-models': async el => {
+    const st = SET.text;
+    if (!st.key) return toast('先填写文字 API 的 Key');
+    el.disabled = true; el.classList.add('loading');
+    try {
+      let url, headers = {};
+      if (st.provider === 'gemini') {
+        const base = (st.base || 'https://generativelanguage.googleapis.com').replace(/\\/+$/, '');
+        url = `${base}/v1beta/models?key=${encodeURIComponent(st.key)}`;
+      } else {
+        const base = v1(st.base, st.provider === 'deepseek' ? 'https://api.deepseek.com' : 'https://api.openai.com');
+        url = base + '/models'; headers = hdr(st.key);
+      }
+      const r = await fetch(url, { method: 'GET', headers });
+      if (!r.ok) throw await apiErr(r, '拉取模型失败：');
+      const j = await r.json();
+      const ids = st.provider === 'gemini'
+        ? (j.models || []).filter(x => (x.supportedGenerationMethods || []).includes('generateContent')).map(x => String(x.name || '').replace(/^models\\//, ''))
+        : (j.data || []).map(x => x.id).filter(Boolean);
+      const models = [...new Set(ids)].sort((a, b) => a.localeCompare(b));
+      if (!models.length) throw new Error('接口返回成功，但没有找到可用模型；请检查接口的 /models 返回格式');
+      st.modelOptions = models; saveSettings();
+      const dl = $('#textModelList'); if (dl) dl.innerHTML = models.map(x => `<option value="${esc(x)}"></option>`).join('');
+      toast(`已拉取 ${models.length} 个模型，点模型名输入框即可选择`);
+    } catch (err) {
+      const msg = /Failed to fetch|CORS|NetworkError/i.test(err.message) ? '浏览器跨域请求被拦截（CORS）；需要服务商开放 /models 跨域，或给文字 API 加代理' : err.message;
+      toast('拉取失败：' + esc(msg), 7000);
+    } finally { el.disabled = false; el.classList.remove('loading'); }
+  },
   'test-text': async el => { el.disabled = true; try { const t = await aiChat([{ role: 'user', content: '只回复 JSON：{"ok":true}' }]); toast('连接正常：' + esc(t.slice(0, 60))); } catch (err) { toast('失败：' + esc(err.message), 6000); } finally { el.disabled = false; } },
   'export-full': () => exportAll(true),
   'export-data': () => exportAll(false),
@@ -2559,6 +2590,7 @@ async function aiAppearance(text) { const t = await aiChat([{ role: 'system', co
 function artistStringOf(e) {
   return compTokens(e).map(t => t.c === 'artist' ? (t.w !== 1 ? `${t.w}::artist:${t.n}::` : `artist:${t.n}`) : (t.w !== 1 ? `${t.w}::${t.n}::` : t.n)).join(', ');
 }
+function boardPromptOf(e) { return typeof e?.prompt === 'string' && e.prompt.trim() ? e.prompt.trim() : artistStringOf(e); }
 function rowOptions(sel = '') {
   const rows = buildRows(S.entries).filter(r => r.key !== '__none__');
   return `<option value="">从画谱选一组画师…</option>` + rows.map(r => `<option value="${esc(r.base.id)}" ${sel === r.base.id ? 'selected' : ''}>${esc(r.names.join(' · '))}</option>`).join('');
@@ -3116,8 +3148,8 @@ function renderStory(main) {
       <label class="field"><span>角色外观 <em class="muted">留空就让 AI 从故事里提取；写了就以这里为准</em></span>
         <textarea class="auto" rows="2" data-bf="charsText" placeholder="例如：她——黑色短发、挑染紫色、金色瞳孔、黑色皮夹克、左眼下有条码纹身">${esc(b.charsText)}</textarea></label>
       ${S.cards.length ? `<div class="row-inline"><select id="bdCard"><option value="">从角色卡提取外观…</option>${S.cards.map(c => `<option value="${c.id}">${esc(c.data.name)}</option>`).join('')}</select></div>` : ''}
-      <label class="field mt"><span>画风</span><select id="bdRow">${rowOptions()}</select></label>
-      <input class="inp" data-bf="artist" value="${esc(b.artist)}" placeholder="artist:xxx, 0.8::artist:yyy::（每张都会加在最前面）">
+      <label class="field mt"><span>从画谱选择画师串</span><select id="bdRow">${rowOptions()}</select></label>
+      <label class="field"><span>统一正面提示词 <em class="muted">所选记录的完整正面串；每个镜头都会加在最前面</em></span><textarea class="auto mono" rows="3" data-bf="artist" placeholder="artist:xxx, 1girl, detailed background, ...">${esc(b.artist)}</textarea></label>
       <details class="gparams" ${S.bdParams ? 'open' : ''}><summary>生图参数</summary>
         <label class="field"><span>质量词</span><input data-bf="quality" value="${esc(b.quality)}"></label>
         <label class="field"><span>负面</span><textarea class="auto" rows="2" data-bf="negative">${esc(b.negative)}</textarea></label>
@@ -3263,7 +3295,7 @@ document.addEventListener('change', async ev => {
   if (S.view !== 'story') return; const t = ev.target;
   if (t.type === 'checkbox' || t.tagName === 'SELECT' || t.type === 'number') { if (boardField(t)) { if (t.dataset.bf === 'fixedSeed') renderStory($('#main')); return; } }
   const b = curBoard();
-  if (t.id === 'bdRow') { const e = byId(t.value); if (e) { b.artist = artistStringOf(e); $('[data-bf="artist"]').value = b.artist; b.shots.forEach(s => refreshFinalPrompt(b, s)); boardSaveSoon(b); } t.value = ''; }
+  if (t.id === 'bdRow') { const e = byId(t.value); if (e) { b.artist = boardPromptOf(e); b.negative = typeof e.negative === 'string' ? e.negative : SET.nai.neg; const p = $('[data-bf="artist"]'); if (p) { p.value = b.artist; autoGrow(p); } const n = $('[data-bf="negative"]'); if (n) n.value = b.negative; S.bdParams = true; const gp = $('.gparams'); if (gp) gp.open = true; b.shots.forEach(s => refreshFinalPrompt(b, s)); boardSaveSoon(b); } t.value = ''; }
   if (t.id === 'bdCard') {
     const c = S.cards.find(x => x.id === t.value); t.value = ''; if (!c) return;
     if (!aiReady()) { b.charsText = `${c.data.name}：${c.data.description.slice(0, 400)}`; }
