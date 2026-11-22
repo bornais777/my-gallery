@@ -1856,13 +1856,14 @@ function renderSettings(main) {
 /* ================= 编辑器（添加文字串 / 编辑 / 生图） ================= */
 function entryEditor(e, { focusGen = false } = {}) {
   const isNew = !e;
-  const d = e || { prompt: isNew ? SET.nai.defaultPrompt : '', negative: '', params: isNew ? { steps: SET.nai.steps, scale: SET.nai.scale, sampler: SET.nai.sampler } : {}, vibes: [], folderId: S.filters.folder && S.filters.folder !== '__none' ? S.filters.folder : '', note: '' };
-  const st = { vibes: structuredClone(d.vibes || []), img: null, arts: e ? artistsOf(e).map(a => ({ ...a })) : null, artsDirty: false, artsReset: false, eng: 'nai', genSeed: null };
+  const d = e || { prompt: isNew ? SET.nai.defaultPrompt : '', negative: '', params: isNew ? { steps: SET.nai.steps, scale: SET.nai.scale, sampler: SET.nai.sampler, cfgRescale: SET.nai.cfgRescale, ucPreset: SET.nai.ucPreset, noiseSchedule: SET.nai.noiseSchedule } : {}, vibes: [], folderId: S.filters.folder && S.filters.folder !== '__none' ? S.filters.folder : '', note: '' };
+  const basePrompt = e?.basePrompt ?? d.prompt;
+  const st = { vibes: structuredClone(d.vibes || []), img: null, arts: e ? artistsOf(e).map(a => ({ ...a })) : null, artsDirty: false, artsReset: false, eng: 'nai', genSeed: null, testTheme: d.testTheme || '', testTags: d.testTags || '', testOrder: d.testOrder || 'base-first', multiCharacter: d.multiCharacter === true, charPrompts: d.charPrompts || '' };
   const curLabel = modelLabel(d.params?.modelRaw);
   const m = openModal(`<div class="ed-head"><h3>${isNew ? '添加文字串' : '编辑'}</h3><button class="btn icon-btn ghost" data-act="close">${ic('x')}</button></div>
   <div class="ed-grid">
     <div class="ed-main">
-      <label class="field"><span>正面提示词</span><textarea id="edP" rows="6" placeholder="artist:xxx, 1.2::artist:yyy::, best quality, …">${esc(d.prompt)}</textarea></label>
+      <label class="field"><span>正面提示词</span><textarea id="edP" rows="6" placeholder="artist:xxx, 1.2::artist:yyy::, best quality, …">${esc(basePrompt)}</textarea></label>
       <label class="field"><span>负面提示词</span><textarea id="edN" rows="3">${esc(d.negative)}</textarea></label>
       <div class="f4">
         <label class="field"><span>模型</span><select id="edM"><option value="">未填</option>${SET.models.map(x => `<option value="${esc(x.api)}" ${curLabel === x.label ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select></label>
@@ -1888,7 +1889,7 @@ function entryEditor(e, { focusGen = false } = {}) {
   </div>
   <div class="m-actions"><button class="btn" data-act="close">取消</button><button class="btn pri" id="edSave">保存</button></div>`, { wide: true, cls: 'editor' });
   observeThumbs(m);
-
+  $('#edN', m).insertAdjacentHTML('beforebegin', '<div class="test-workbench"><div class="field"><span>通用测试方向</span><input id="edTestTheme" placeholder="例如：随机人像、电影构图、参考古典名画" value="' + esc(st.testTheme) + '"></div><div class="field"><span>AI 生成的通用提示词（Roll 只重生成这段文字）</span><textarea id="edTestTags" rows="3" placeholder="Roll 后生成 NAI 标签；不 Roll 就沿用这里的内容">' + esc(st.testTags) + '</textarea></div><div class="row-inline"><button class="btn sm" id="edRoll" ' + (aiReady() ? '' : 'disabled') + '>↻ Roll 通用提示词</button><button class="btn sm" id="edTestOrder">' + (st.testOrder === 'base-first' ? '当前顺序：正面提示词在前' : '当前顺序：通用提示词在前') + ' · 切换顺序</button></div><div class="field"><span>最终提示词预览</span><div id="edTestPreview" class="ptxt mono"></div></div></div>');
   const vbox = $('#edV', m);
   const drawVibes = () => {
     vbox.innerHTML = st.vibes.map((v, i) => `<div class="vslot" data-i="${i}">
@@ -1901,6 +1902,13 @@ function entryEditor(e, { focusGen = false } = {}) {
   vbox.addEventListener('click', ev => { const b = ev.target.closest('[data-k="rm"]'); if (!b) return; st.vibes.splice(+b.closest('.vslot').dataset.i, 1); drawVibes(); });
   $('#edVAdd', m).onclick = () => { st.vibes.push({ vibeId: S.vibes[0]?.id || null, strength: 0.6, info: 1, sig: null }); drawVibes(); };
   drawVibes();
+  const composePrompt = () => { const base = $('#edP', m).value.trim(), test = $('#edTestTags', m).value.trim(); return [st.testOrder === 'base-first' ? base : test, st.testOrder === 'base-first' ? test : base].filter(Boolean).join(', '); };
+  const updateTestPreview = () => { $('#edTestPreview', m).textContent = composePrompt() || '（空）'; };
+  $('#edP',m).addEventListener('input', updateTestPreview); $('#edTestTags',m).addEventListener('input', updateTestPreview);
+  $('#edTestTheme',m).addEventListener('input', ev => { st.testTheme = ev.target.value; });
+  $('#edTestOrder',m).onclick = () => { st.testOrder = st.testOrder === 'base-first' ? 'test-first' : 'base-first'; $('#edTestOrder',m).textContent = (st.testOrder === 'base-first' ? '当前顺序：正面提示词在前' : '当前顺序：通用提示词在前') + ' · 切换顺序'; updateTestPreview(); };
+  $('#edRoll',m).onclick = async () => { const theme = $('#edTestTheme',m).value.trim(); if (!theme) return toast('先写一个测试方向'); if (!aiReady()) return toast('先在设置里配置文字 API'); const btn = $('#edRoll',m); btn.disabled = true; btn.classList.add('loading'); try { const out = await aiChat([{role:'system',content:'你是 NovelAI Danbooru 标签提示词生成器。把用户给出的创作方向转成可直接用于 NovelAI 的英文标签串。只输出逗号分隔的标签，不解释、不加代码块、不写画师名。内容聚焦一般人像、构图、光线、艺术风格和场景表达。'}, {role:'user',content:theme}],{json:false}); st.testTags = String(out).replace(/```[a-z]*|```/gi,'').trim().replace(/^提示词[:：]/,''); $('#edTestTags',m).value = st.testTags; updateTestPreview(); } catch(err) { toast('Roll 失败：'+esc(err.message),5000); } finally { btn.disabled = false; btn.classList.remove('loading'); } };
+  updateTestPreview();
 
   if (e) {
     const abox = $('#edA', m);
@@ -1920,13 +1928,14 @@ function entryEditor(e, { focusGen = false } = {}) {
   };
   $('#edEng', m).onclick = ev => { const b = ev.target.closest('[data-e]'); if (!b) return; st.eng = b.dataset.e; $$('#edEng button', m).forEach(x => x.classList.toggle('on', x === b)); drawSizes(); };
   drawSizes();
-
+  $('.f4',m).insertAdjacentHTML('afterend', '<details class="gparams"><summary>高级 NAI 参数</summary><div class="f3"><label class="field"><span>CFG Rescale</span><input id="edCfgRescale" type="number" min="0" max="1" step="0.05" value="' + (d.params?.cfgRescale ?? SET.nai.cfgRescale ?? 0) + '"></label><label class="field"><span>采样器</span><select id="edSampler"><option value="k_euler_ancestral">Euler Ancestral</option><option value="k_euler">Euler</option><option value="k_dpmpp_2s_ancestral">DPM++ 2S Ancestral</option><option value="k_dpmpp_2m">DPM++ 2M</option><option value="k_dpmpp_sde">DPM++ SDE</option></select></label><label class="field"><span>噪声调度</span><select id="edNoise"><option value="karras">Karras</option><option value="exponential">Exponential</option><option value="polyexponential">Polyexponential</option></select></label></div><div class="f2"><label class="field"><span>UC 预设</span><select id="edUC"><option value="0">Heavy</option><option value="1">Light</option><option value="2">Human focus</option><option value="3">Furry focus</option><option value="4">None</option></select></label><label class="check"><input type="checkbox" id="edQuality" ' + ((d.params?.qualityToggle ?? SET.nai.qualityToggle) !== false ? 'checked' : '') + '> 使用质量词开关</label></div><label class="check"><input type="checkbox" id="edMulti" ' + (st.multiCharacter ? 'checked' : '') + '> 多角色分离提示词</label><label class="field"><span>角色提示词（多角色模式，每行一个角色）</span><textarea id="edCharPrompts" rows="3" placeholder="girl, silver hair, blue eyes&#10;boy, black hair, red eyes">' + esc(st.charPrompts) + '</textarea></label></details>');
+  $('#edSampler',m).value = d.params?.sampler || SET.nai.sampler || 'k_euler_ancestral'; $('#edNoise',m).value = d.params?.noiseSchedule || SET.nai.noiseSchedule || 'karras'; $('#edUC',m).value = String(d.params?.ucPreset ?? SET.nai.ucPreset ?? 2);
   const showImg = blob => { const u = URL.createObjectURL(blob); $('#edImg', m).innerHTML = `<img src="${u}" class="ld" alt="">`; };
   $('#edUp', m).onclick = () => pickFile('image/*', false, async fs => { if (!fs[0]) return; st.img = { blob: fs[0], source: null }; showImg(fs[0]); });
   const num = id => { const v = $(id, m).value; return v === '' ? null : +v; };
 
   $('#edGen', m).onclick = async () => {
-    const prompt = $('#edP', m).value.trim(); if (!prompt) return toast('先写提示词');
+    const prompt = composePrompt(); if (!prompt) return toast('先写提示词');
     const btn = $('#edGen', m), msg = $('#edGenMsg', m);
     btn.disabled = true; btn.classList.add('loading'); msg.textContent = '生成中，通常要十几秒…';
     try {
@@ -1936,7 +1945,8 @@ function entryEditor(e, { focusGen = false } = {}) {
         const api = $('#edM', m).value || SET.nai.model;
         const vibes = [];
         for (const v of st.vibes) { const vb = S.vibes.find(x => x.id === v.vibeId); const enc = await getVibeEncoding(vb, api); if (enc) vibes.push({ enc, strength: v.strength, info: v.info }); else if (vb) toast(`vibe「${esc(vb.name)}」没有这个模型的编码，这次没带上`); }
-        const r = await genNAI({ prompt, negative: $('#edN', m).value.trim(), model: api, size: sizeSel.value, seed: num('#edSeed'), steps: num('#edSteps'), scale: num('#edScale'), vibes });
+        const charPrompts = $('#edCharPrompts',m).value.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+        const r = await genNAI({ prompt, chars: $('#edMulti',m).checked ? charPrompts : null, multiCharacter: $('#edMulti',m).checked, negative: $('#edN', m).value.trim(), model: api, size: sizeSel.value, seed: num('#edSeed'), steps: num('#edSteps'), scale: num('#edScale'), cfgRescale: num('#edCfgRescale'), sampler: $('#edSampler',m).value, noiseSchedule: $('#edNoise',m).value, ucPreset: num('#edUC'), qualityToggle: $('#edQuality',m).checked, vibes });
         blob = r.blob; seed = r.seed;
       }
       st.img = { blob, source: 'gen' }; st.genSeed = seed; showImg(blob);
@@ -1948,15 +1958,15 @@ function entryEditor(e, { focusGen = false } = {}) {
   if (focusGen) setTimeout(() => $('#edGen', m).scrollIntoView({ block: 'nearest' }), 100);
 
   $('#edSave', m).onclick = async () => {
-    const prompt = $('#edP', m).value.trim();
+    const base = $('#edP', m).value.trim(); const prompt = composePrompt();
     if (!prompt && !st.img && !e?.thumbId) return toast('提示词是空的');
     const ent = e || { id: uid(), createdAt: now(), source: 'text', star: false, tokens: [], params: {}, vibes: [] };
     const beforeKey = e ? groupKey(e) : null;
     const promptChanged = ent.prompt !== prompt;
-    ent.prompt = prompt; ent.negative = $('#edN', m).value.trim();
+    ent.prompt = prompt; ent.basePrompt = base; ent.testTheme = $('#edTestTheme',m).value.trim(); ent.testTags = $('#edTestTags',m).value.trim(); ent.testOrder = st.testOrder; ent.multiCharacter = $('#edMulti',m).checked; ent.charPrompts = $('#edCharPrompts',m).value; ent.negative = $('#edN', m).value.trim();
     const mv = $('#edM', m).value;
     const keepRaw = ent.params?.modelRaw && !SET.models.some(x => x.label === modelLabel(ent.params.modelRaw));
-    ent.params = { ...ent.params, modelRaw: mv || (keepRaw ? ent.params.modelRaw : ''), seed: num('#edSeed'), steps: num('#edSteps'), scale: num('#edScale') };
+    ent.params = { ...ent.params, modelRaw: mv || (keepRaw ? ent.params.modelRaw : ''), seed: num('#edSeed'), steps: num('#edSteps'), scale: num('#edScale'), cfgRescale: num('#edCfgRescale'), sampler: $('#edSampler',m).value, noiseSchedule: $('#edNoise',m).value, ucPreset: num('#edUC'), qualityToggle: $('#edQuality',m).checked };
     ent.vibes = st.vibes.filter(v => v.vibeId || v.strength != null).map(v => ({ sig: v.sig || null, strength: v.strength, info: v.info, vibeId: v.vibeId || null }));
     for (const v of ent.vibes) if (v.vibeId && v.sig) { const vb = S.vibes.find(x => x.id === v.vibeId); if (vb && !vb.sigs?.includes(v.sig)) { (vb.sigs ||= []).push(v.sig); await putVibe(vb); } }
     if (promptChanged || !ent.tokens?.length) ent.tokens = tokenize(prompt);
