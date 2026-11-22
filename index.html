@@ -1215,10 +1215,7 @@ async function genGPT({ prompt, size }) {
       }
     }
     if (streamError) throw new Error('茶蘼 GPT 返回错误：' + streamError + '（不要自动重试）');
-    let found = findImageInText(content);
-    if (!found) {
-
-    }
+    const found = findImageInText(content);
     if (!found) throw new Error('茶蘼 GPT 返回 HTTP 200，但没有解析到图片；请查看控制台返回内容，不要自动重试。');
     return await toImage(found);
   }
