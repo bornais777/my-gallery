@@ -2261,7 +2261,7 @@ const ACT = {
     try {
       let url, headers = {};
       if (st.provider === 'gemini') {
-        const base = (st.base || 'https://generativelanguage.googleapis.com').replace(/\\/+$/, '');
+        let base = (st.base || 'https://generativelanguage.googleapis.com').trim(); while (base.endsWith('/')) base = base.slice(0, -1);
         url = `${base}/v1beta/models?key=${encodeURIComponent(st.key)}`;
       } else {
         const base = v1(st.base, st.provider === 'deepseek' ? 'https://api.deepseek.com' : 'https://api.openai.com');
@@ -2271,7 +2271,7 @@ const ACT = {
       if (!r.ok) throw await apiErr(r, '拉取模型失败：');
       const j = await r.json();
       const ids = st.provider === 'gemini'
-        ? (j.models || []).filter(x => (x.supportedGenerationMethods || []).includes('generateContent')).map(x => String(x.name || '').replace(/^models\\//, ''))
+        ? (j.models || []).filter(x => (x.supportedGenerationMethods || []).includes('generateContent')).map(x => { const name = String(x.name || ''); return name.startsWith('models/') ? name.slice(7) : name; })
         : (j.data || []).map(x => x.id).filter(Boolean);
       const models = [...new Set(ids)].sort((a, b) => a.localeCompare(b));
       if (!models.length) throw new Error('接口返回成功，但没有找到可用模型；请检查接口的 /models 返回格式');
