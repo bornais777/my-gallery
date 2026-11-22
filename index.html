@@ -1795,6 +1795,7 @@ function chipTok(t) { const c = catOf(t); return `<span class="chip cat cat-${c}
 function xpHTML(e, isBase, r) {
   const toks = e.tokens || [];
   const gen = toks.filter(t => catOf(t) === 'general');
+  const scene = toks.filter(t => catOf(t) === 'scene');
   const p = e.params || {};
   const meta = [['模型', entryModel(e)], ['Seed', p.seed], ['Steps', p.steps], ['Scale', p.scale], ['Sampler', p.sampler], ['尺寸', (e.dims?.w || p.width) ? `${e.dims?.w || p.width}×${e.dims?.h || p.height}` : ''], ['来源', SRC[e.source]], ['入库', fmtTime(e.createdAt)]].filter(x => x[1] != null && x[1] !== '');
   return `<div class="xp">
@@ -1803,6 +1804,7 @@ function xpHTML(e, isBase, r) {
     <div class="xp-sec"><div class="xp-l">负面<button class="btn xs ghost" data-act="copy" data-id="${e.id}" data-f="negative">${ic('copy', 12)}复制</button></div><p class="ptxt neg">${esc(e.negative) || '—'}</p></div>
     <div class="meta-grid">${meta.map(([k, v]) => `<span>${k}</span><b>${esc(v)}</b>`).join('')}</div>
     ${gen.length ? `<div class="xp-sec"><div class="xp-l">通用词<button class="btn xs ghost" data-act="copy" data-id="${e.id}" data-f="general">${ic('copy', 12)}复制</button></div><div class="chips">${gen.map(t => `<span class="chip general mono" data-act="tokmenu" data-n="${esc(t.n)}">${esc(t.raw)}</span>`).join('')}</div></div>` : ''}
+    ${scene.length ? `<div class="xp-sec"><div class="xp-l">画面词（场景专用，不会自动带入分镜画师串）<button class="btn xs ghost" data-act="copy" data-id="${e.id}" data-f="scene">${ic('copy', 12)}复制</button></div><div class="chips">${scene.map(t => `<span class="chip cat cat-scene mono" data-act="tokmenu" data-n="${esc(t.n)}">${esc(t.raw)}</span>`).join('')}</div></div>` : ''}
     ${toks.length ? `<div class="xp-sec"><div class="xp-l">全部分词<span class="muted sm">点词改类别，全库生效</span></div><div class="chips">${toks.map(chipTok).join('')}</div></div>` : ''}
     ${e.note ? `<div class="note">${esc(e.note)}</div>` : ''}
     <div class="xp-act">
@@ -2313,7 +2315,7 @@ const ACT = {
   lightbox: el => { const ids = lbIdsFor(el); openLightbox(ids, ids.indexOf(el.dataset.id)); },
   copy: async el => {
     const e = byId(el.dataset.id); if (!e) return; const f = el.dataset.f;
-    const txt = f === 'general' ? e.tokens.filter(t => catOf(t) === 'general').map(t => t.raw).join(', ') : e[f] || '';
+    const txt = ['general','scene'].includes(f) ? e.tokens.filter(t => catOf(t) === f).map(t => t.raw).join(', ') : e[f] || '';
     try { await navigator.clipboard.writeText(txt); toast('已复制'); } catch { toast('复制失败，浏览器不允许'); }
   },
   tokmenu: (el, ev) => {
