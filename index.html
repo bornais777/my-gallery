@@ -2157,12 +2157,21 @@ async function ingestFile(file) {
   return { entry: e };
 }
 async function addImages(files) {
-  files = [...files].filter(f => f.type.startsWith('image/') || /\.(png|jpe?g|webp)$/i.test(f.name));
+  files = [...files].filter(f => f.type.startsWith('image/') || /\.(png|jpe?g|webp|json)$/i.test(f.name));
   if (!files.length) return;
   const added = [], noMeta = [], cardFiles = [], imageFiles = [];
   let skipped = 0, duplicateCards = 0, importedCards = 0, lastCard = null;
   // 混合上传时先识别带角色卡数据的 PNG，其余图片仍按画师串导入。
   for (const file of files) {
+    if (/\.json$/i.test(file.name) || file.type === 'application/json') {
+      try {
+        const parsed = await readCardFile(file);
+        cardFiles.push({ file, parsed });
+      } catch (err) {
+        toast(`${esc(file.name)} 角色卡数据读取失败：${esc(err.message)}`, 5000);
+      }
+      continue;
+    }
     if (/\.png$/i.test(file.name) || file.type === 'image/png') {
       try {
         const parsed = await parseCardPNG(file);
@@ -2363,7 +2372,7 @@ const byId = id => S.entries.find(e => e.id === id);
 const ACT = {
   view: el => { S.view = el.dataset.v; if (S.view !== 'library') S.selectMode = false; render(); window.scrollTo({ top: 0 }); },
   close: () => closeModal(),
-  'add-img': () => pickFile('image/*', true, addImages),
+  'add-img': () => pickFile('image/*,.json,application/json', true, addImages),
   'add-text': () => entryEditor(null),
   'add-vibe': () => pickFile('.naiv4vibe,.naiv4vibebundle,.json,image/*', true, addVibes),
   newfolder: async () => { const n = await promptText('新建文件夹', '', '例如 V4.5 / V5 / 厚涂'); if (!n) return; const f = { id: uid(), name: n, createdAt: now() }; await putFolder(f); toast(`已建「${esc(n)}」`); if (S.view === 'library') refreshList(); },
