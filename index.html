@@ -583,6 +583,7 @@ textarea.auto{resize:none;overflow:hidden}
 .sbsw{display:flex;align-items:center;gap:8px;font-size:13px;height:36px;white-space:nowrap}
 body[data-view=cards] .fab,body[data-view=story] .fab,body[data-view=settings] .fab{display:none}
 
+.tag-classify-list{max-height:62vh;overflow:auto;display:flex;flex-direction:column;gap:7px;padding:8px 2px}.tag-classify-list .row-inline{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 8px;border-bottom:1px solid var(--line)}.tag-classify-list .row-inline span{min-width:0;overflow-wrap:anywhere}.tag-classify-list select{min-width:112px}
 </style>
 </head>
 <body>
@@ -888,7 +889,8 @@ async function setArtistGroupName(r, useAI = false) {
   try {
     let image = null;
     if (e?.origId) { try { const blob = await getBlob(e.origId); const small = await makeThumb(blob,768,'image/jpeg'); image = { mime:'image/jpeg', b64: await blobToB64(small.blob) }; } catch {} }
-    const out = await aiChat([{role:'system',content:'你是插画风格命名助手。根据参考图的视觉风格和标签，取一个简短、容易辨认的中文风格名称，2到8个汉字。不要写解释，不要加引号，不要猜测画师身份。'}, {role:'user',content:'画师标签：'+r.names.join('、')+'\n风格标签：'+tags.join(', ')+'\n请只返回风格名称。'}],{json:false,image});
+    const msgs = [{role:'system',content:'你是插画风格命名助手。根据参考图的视觉风格和标签，取一个简短、容易辨认的中文风格名称，2到8个汉字。不要写解释，不要加引号，不要猜测画师身份。'}, {role:'user',content:'画师标签：'+r.names.join('、')+'\n风格标签：'+tags.join(', ')+'\n请只返回风格名称。'}];
+    let out; try { out = await aiChat(msgs,{json:false,image}); } catch(err) { if (!image) throw err; out = await aiChat(msgs,{json:false}); }
     const name = String(out).trim().split('\n')[0].split('。')[0].slice(0,24);
     if (name) { S.meta.artistNames ||= {}; S.meta.artistNames[r.key] = name; await saveMeta(); }
     wait.remove(); refreshList();
