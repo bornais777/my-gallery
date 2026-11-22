@@ -1180,6 +1180,49 @@ async function parseImagesResponse(r) {
 }
 async function genGPT({ prompt, size }) {
   const g = SET.gpt; if (!g.key) throw new Error('先在设置里填 GPT 生图 API');
+  if (g.mode === 'chami') {
+    const base = (g.base || 'http://chami.yyqzx.com').trim().replace(/\/+$/, '');
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 300000);
+    let r, raw;
+    try {
+      r = await fetch(base + '/GPTimage/chami/v1/chat/completions', {
+        method: 'POST',
+        headers: hdr(g.key),
+        body: JSON.stringify({ model: g.model || 'gpt-image-2', messages: [{ role: 'user', content: prompt }], size: size || g.size || '1024x1024', stream: true }),
+        signal: ctrl.signal,
+      });
+      raw = await r.text();
+    } catch (e) {
+      throw new Error(e.name === 'AbortError' ? '茶蘼 GPT 等待超过 300 秒，已停止；不要自动重试。' : '茶蘼 GPT 网络请求失败：' + e.message + '。请检查 HTTPS、CORS 和 CF 代理设置。');
+    } finally { clearTimeout(timer); }
+    if (!r.ok) throw new Error('茶蘼 GPT HTTP ' + r.status + '：' + raw.slice(0, 500) + '（本次请求未自动重试）');
+    let content = '', streamError = '';
+    for (const line of raw.split(/\r?\n/)) {
+      if (!line.startsWith('data:')) continue;
+      const part = line.slice(5).trim();
+      if (!part || part === '[DONE]') continue;
+      let j; try { j = JSON.parse(part); } catch { continue; }
+      if (j.error) {
+        const e = j.error;
+        streamError = typeof e === 'string' ? e : (e.message || e.msg || JSON.stringify(e));
+        break;
+      }
+      for (const choice of (j.choices || [])) {
+        const c = choice.delta?.content ?? choice.message?.content;
+        if (typeof c === 'string') content += c;
+        else if (Array.isArray(c)) content += c.map(x => x?.text || x?.image_url?.url || '').join('');
+      }
+    }
+    if (streamError) throw new Error('茶蘼 GPT 返回错误：' + streamError + '（不要自动重试）');
+    let found = findImageInText(content);
+    if (!found) {
+      const md = content.match(/!\\[[^\\]]*\\]\\((https?:\\/\\/[^)\\s]+)\\)/);
+      if (md) found = md[1];
+    }
+    if (!found) throw new Error('茶蘼 GPT 返回 HTTP 200，但没有解析到图片；请查看控制台返回内容，不要自动重试。');
+    return await toImage(found);
+  }
   const base = v1(g.base, 'https://api.openai.com');
   if (g.mode === 'chat') {
     const r = await fetch(base + '/chat/completions', { method: 'POST', headers: hdr(g.key), body: JSON.stringify({ model: g.model, messages: [{ role: 'user', content: prompt }] }) });
@@ -1964,10 +2007,12 @@ function renderSettings(main) {
      <label class="field"><span>默认负面（分镜和封面用）</span><textarea rows="3" data-set="nai.neg">${esc(SET.nai.neg)}</textarea></label>
    </section>
    <section class="scard glass"><h3>${ic('image')}GPT 生图</h3>
-     ${sel('gpt.mode', '中转站接口格式', [['images', 'images/generations'], ['chat', 'chat/completions（回复里带图）']])}
-     ${fld('gpt.base', '接口地址', 'https://你的中转站域名')}
-     ${fld('gpt.key', 'Key', '', 'password')}
-     ${fld('gpt.model', '模型名', 'gpt-image-1')}
+     ${sel('gpt.mode', '接口格式', [['images', 'images/generations'], ['chat', 'chat/completions（回复里带图）'], ['chami', '茶蘼 GPT（SSE 流式）']])}
+     ${fld('gpt.base', '接口地址 / 域名', '茶蘼默认 http://chami.yyqzx.com；CF 后填你的 HTTPS 域名（只填域名）')}
+     ${fld('gpt.key', 'GPT 线单个 API Key（不要用 NAI 组合 Key）', '', 'password')}
+     <label class="field"><span>模型名</span><input data-set="gpt.model" list="gptModelList" value="${esc(SET.gpt.model || '')}" placeholder="gpt-image-2"></label>
+     <datalist id="gptModelList"><option value="gpt-image-2"></option><option value="gpt-image-2.5"></option></datalist>
+     <p class="muted sm">茶蘼 GPT 使用 /GPTimage/chami/v1/chat/completions，必须 stream=true；模型可选 gpt-image-2 或 gpt-image-2.5。错误不会自动重试。</p>
      ${sel('gpt.size', '尺寸', [['1024x1536', '1024×1536 竖'], ['1536x1024', '1536×1024 横'], ['1024x1024', '1024×1024 方']])}
    </section>
    <section class="scard glass"><h3>${ic('rows')}模型名映射<span class="muted">V5 出来时在这里加一行，不用改代码</span></h3>
