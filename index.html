@@ -1635,7 +1635,7 @@ function renderHome(main) {
   const has = new Set(rows.map(r => (r.sort[0] || '').toUpperCase()));
   main.innerHTML = `<div class="home">
     <div class="hero"><h1>画谱</h1><p>${rows.length} 组画师 · ${S.entries.length} 条串 · ${S.vibes.length} 个 vibe</p>
-      <div class="search hero-search glass">${ic('search')}<input id="homeSearch" placeholder="输入画师名或画风名，牌会转过去" autocomplete="off"></div><div class="hero-actions"><button class="btn" data-act="style-names">画风命名 / 管理</button><button class="btn pri" data-act="style-batch">AI 批量命名</button></div></div>
+      <div class="search hero-search glass">${ic('search')}<input id="homeSearch" placeholder="输入画师名或画风名，牌会转过去" autocomplete="off"></div><div class="hero-actions"><button class="btn" data-act="style-names">画风命名 / 管理</button><button class="btn pri" data-act="style-batch">AI 批量命名</button><button class="btn" data-act="reclassify-selected">${ic('wand', 15)}AI 二次分类</button></div></div>
     <div class="fan" id="fan" style="--fw:${fanW()}px">${rows.map((r, i) => fanCard(r, i)).join('')}</div>
     <div class="fan-ctrl"><button class="btn icon-btn" data-act="fan-step" data-d="-1" aria-label="上一张">${ic('chev')}</button><span id="fanPos"></span><button class="btn icon-btn" data-act="fan-step" data-d="1" aria-label="下一张">${ic('chev')}</button></div>
     <div class="az glass">${letters.map(l => `<button data-act="az" data-l="${l}" ${has.has(l) ? '' : 'disabled'}>${l}</button>`).join('')}<button data-act="az" data-l="#">#</button></div>
