@@ -584,6 +584,7 @@ textarea.auto{resize:none;overflow:hidden}
 body[data-view=cards] .fab,body[data-view=story] .fab,body[data-view=settings] .fab{display:none}
 
 .tag-classify-list{max-height:62vh;overflow:auto;display:flex;flex-direction:column;gap:7px;padding:8px 2px}.tag-classify-list .row-inline{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 8px;border-bottom:1px solid var(--line)}.tag-classify-list .row-inline span{min-width:0;overflow-wrap:anywhere}.tag-classify-list select{min-width:112px}
+.style-name-list{max-height:60vh;overflow:auto;display:flex;flex-direction:column;gap:7px}.style-name-row{display:flex;align-items:center;gap:8px;padding:9px 4px;border-bottom:1px solid var(--line)}.style-name-row>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}.style-name-row small{color:var(--muted);overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -882,19 +883,36 @@ function pendingTags() { const p = new Set(); for (const e of S.entries) for (co
 function artistGroupLabel(r) { return S.meta.artistNames?.[r.key] || r.names.join(' · ') || '未命名画师组'; }
 async function setArtistGroupName(r, useAI = false) {
   if (!r || r.key === '__none__') return;
-  if (!useAI) { const v = await promptText('给画师组命名', S.meta.artistNames?.[r.key] || '', '例如：清透赛璐璐 / 柔和厚涂'); if (v == null) return; S.meta.artistNames ||= {}; if (v.trim()) S.meta.artistNames[r.key] = v.trim(); else delete S.meta.artistNames[r.key]; await saveMeta(); refreshList(); return; }
+  if (!useAI) { const v = await promptText('编辑画风识别名', S.meta.artistNames?.[r.key] || '', '例如：亮晶晶 / 写实 / 烟雾'); if (v == null) return; S.meta.artistNames ||= {}; if (v.trim()) S.meta.artistNames[r.key] = v.trim(); else delete S.meta.artistNames[r.key]; await saveMeta(); refreshList(); return; }
   if (!aiReady()) return toast('先在设置里配置文字 API，或者使用「命名」手动填写');
   const e = r.base; const tags = [...new Set(r.items.flatMap(x => (x.tokens || []).filter(t => ['artist','style'].includes(catOf(t))).map(t => t.raw)))].slice(0,80);
   const wait = toast('AI 正在分析画风并命名…',60000);
   try {
     let image = null;
     if (e?.origId) { try { const blob = await getBlob(e.origId); const small = await makeThumb(blob,768,'image/jpeg'); image = { mime:'image/jpeg', b64: await blobToB64(small.blob) }; } catch {} }
-    const msgs = [{role:'system',content:'你是插画风格命名助手。根据参考图的视觉风格和标签，取一个简短、容易辨认的中文风格名称，2到8个汉字。不要写解释，不要加引号，不要猜测画师身份。'}, {role:'user',content:'画师标签：'+r.names.join('、')+'\n风格标签：'+tags.join(', ')+'\n请只返回风格名称。'}];
+    const msgs = [{role:'system',content:'你是插画风格分类命名助手。根据参考图本身的视觉风格、材质、光影、渲染方式和画面内容，取一个简短、便于区分的中文标签，2到6个汉字，例如亮晶晶、写实、3D、烟雾。不要使用画师姓名或作者名；若其他组已有相似名称，请结合这组画面内容取不同名字。只返回名称。'}, {role:'user',content:'画师标签：'+r.names.join('、')+'\n风格标签：'+tags.join(', ')+'\n请只返回风格名称。'}];
     let out; try { out = await aiChat(msgs,{json:false,image}); } catch(err) { if (!image) throw err; out = await aiChat(msgs,{json:false}); }
     const name = String(out).trim().split('\n')[0].split('。')[0].slice(0,24);
     if (name) { S.meta.artistNames ||= {}; S.meta.artistNames[r.key] = name; await saveMeta(); }
     wait.remove(); refreshList();
   } catch(err) { wait.remove(); toast('AI 命名失败：'+esc(err.message),5000); }
+}
+async function batchNameArtistGroups() {
+ if (!aiReady()) return toast('先在设置里配置文字 API');
+ const rows=buildRows(S.entries).filter(r=>r.key!=='__none__');
+ if (!rows.length) return toast('没有可命名的分组');
+ const ok=await ask('AI 批量命名画风','将分析现有 '+rows.length+' 个分组，旧图片也包含在内。已有名称会跳过。',[{t:'取消',v:false},{t:'开始',v:true,cls:'pri'}]);
+ if (!ok) return;
+ for (let i=0;i<rows.length;i++){const r=rows[i];if(S.meta.artistNames?.[r.key])continue;toast('正在命名 '+(i+1)+'/'+rows.length,60000);await setArtistGroupName(r,true);}
+ toast('批量命名完成'); render();
+}
+function openStyleNames() {
+ const rows=buildRows(S.entries).filter(r=>r.key!=='__none__');
+ const html='<div class="ed-head"><h3>画风识别名</h3><button class="btn icon-btn ghost" data-act="close">'+ic('x')+'</button></div><p class="muted sm">这是画风/画面识别名，不是画师姓名。旧分组也能命名。</p><div class="style-name-list">'+rows.map((r,i)=>'<div class="style-name-row"><div><b>'+esc(S.meta.artistNames?.[r.key] || '未命名')+'</b><small>'+esc(r.names.join(' · '))+' · '+r.items.length+' 条</small></div><button class="btn xs" data-si="'+i+'">手动命名</button><button class="btn xs pri" data-ai="'+i+'">AI 命名</button></div>').join('')+'</div><div class="m-actions"><button class="btn" data-act="close">关闭</button><button class="btn pri" id="styleBatch">AI 批量命名</button></div>';
+ const m=openModal(html,{wide:true});
+ $('[data-si]',m).forEach(x=>x.onclick=async()=>{await setArtistGroupName(rows[+x.dataset.si],false);closeModal(m);openStyleNames();});
+ $('[data-ai]',m).forEach(x=>x.onclick=async()=>{await setArtistGroupName(rows[+x.dataset.ai],true);closeModal(m);openStyleNames();});
+ $('#styleBatch',m).onclick=async()=>{closeModal(m);await batchNameArtistGroups();openStyleNames();};
 }
 async function nameNewArtistGroups(entries) {
   if (!aiReady() || !entries?.length) return;
@@ -1533,7 +1551,7 @@ function renderHome(main) {
   const has = new Set(rows.map(r => (r.sort[0] || '').toUpperCase()));
   main.innerHTML = `<div class="home">
     <div class="hero"><h1>画谱</h1><p>${rows.length} 组画师 · ${S.entries.length} 条串 · ${S.vibes.length} 个 vibe</p>
-      <div class="search hero-search glass">${ic('search')}<input id="homeSearch" placeholder="输入画师名，牌会转过去" autocomplete="off"></div></div>
+      <div class="search hero-search glass">${ic('search')}<input id="homeSearch" placeholder="输入画师名或画风名，牌会转过去" autocomplete="off"></div></div>
     <div class="fan" id="fan" style="--fw:${fanW()}px">${rows.map((r, i) => fanCard(r, i)).join('')}</div>
     <div class="fan-ctrl"><button class="btn icon-btn" data-act="fan-step" data-d="-1" aria-label="上一张">${ic('chev')}</button><span id="fanPos"></span><button class="btn icon-btn" data-act="fan-step" data-d="1" aria-label="下一张">${ic('chev')}</button></div>
     <div class="az glass">${letters.map(l => `<button data-act="az" data-l="${l}" ${has.has(l) ? '' : 'disabled'}>${l}</button>`).join('')}<button data-act="az" data-l="#">#</button></div>
@@ -2231,6 +2249,8 @@ const ACT = {
 
   'fan-step': el => fanTo(Math.round(S.homeFocus) + +el.dataset.d),
   'artist-rename': async el => { const r = buildRows(S.entries).find(x => x.id === el.dataset.rid); if (r) await setArtistGroupName(r,false); },
+  'style-names': () => openStyleNames(),
+  'style-batch': () => batchNameArtistGroups(),
   'artist-ai-name': async el => { const r = buildRows(S.entries).find(x => x.id === el.dataset.rid); if (r) await setArtistGroupName(r,true); },
   'classify-manual': () => manualClassifyModal(),
   az: el => { const L = el.dataset.l; const i = S.homeRows.findIndex(r => L === '#' ? !/^[a-z]/i.test(r.sort) : r.sort[0]?.toUpperCase() === L); if (i >= 0) fanTo(i); },
