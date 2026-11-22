@@ -898,14 +898,57 @@ async function setArtistGroupName(r, useAI = false) {
     wait.remove(); refreshList();
   } catch(err) { wait.remove(); toast('AI 命名失败：'+esc(err.message),5000); }
 }
+async function makeStyleContactSheet(rows) {
+ const cell=384, cols=2, rowsN=Math.ceil(rows.length/cols), canvas=document.createElement('canvas');
+ canvas.width=cell*cols; canvas.height=cell*rowsN;
+ const ctx=canvas.getContext('2d'); ctx.fillStyle='#f2f2f2'; ctx.fillRect(0,0,canvas.width,canvas.height);
+ for(let i=0;i<rows.length;i++){
+  const x=(i%cols)*cell, y=Math.floor(i/cols)*cell, r=rows[i];
+  ctx.fillStyle='#fff';ctx.fillRect(x+5,y+5,cell-10,cell-10);
+  ctx.fillStyle='#222';ctx.font='bold 24px sans-serif';ctx.fillText('分组 '+(i+1),x+16,y+34);
+  try{
+   const blob=r.base?.origId?await getBlob(r.base.origId):null;
+   if(blob){const bmp=await createImageBitmap(blob);const pad=14,top=48,scale=Math.min((cell-pad*2)/bmp.width,(cell-top-pad)/bmp.height);const w=bmp.width*scale,h=bmp.height*scale;ctx.drawImage(bmp,x+(cell-w)/2,y+top+(cell-top-h)/2,w,h);bmp.close?.();}
+   else {ctx.fillStyle='#777';ctx.font='16px sans-serif';ctx.fillText('没有可读取的原图',x+18,y+cell/2);}
+  }catch{ctx.fillStyle='#777';ctx.font='16px sans-serif';ctx.fillText('图片读取失败',x+18,y+cell/2);}
+ }
+ const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/jpeg',0.82));
+ if(!blob)throw new Error('无法制作分组预览图');
+ return {mime:'image/jpeg',b64:await blobToB64(blob)};
+}
+async function nameArtistGroupsBatch(rows) {
+ const allNames=Object.values(S.meta.artistNames||{});
+ for(let i=0;i<rows.length;i+=4){
+  const batch=rows.slice(i,i+4);
+  toast('AI 正在同时分析 '+batch.length+' 组画风（'+(i+1)+'/'+rows.length+'）…',60000);
+  const image=await makeStyleContactSheet(batch);
+  const descriptions=batch.map((r,j)=>'分组 '+(j+1)+': 原画师标签='+r.names.join('、')+'；相关标签='+[...new Set(r.items.flatMap(x=>(x.tokens||[]).filter(t=>['artist','style','general','scene'].includes(catOf(t))).map(t=>t.raw)))].slice(0,35).join(', ')).join('\n');
+  const msgs=[
+   {role:'system',content:'你是插画视觉风格识别与命名助手。输入是一张编号拼图，每个格子对应一个独立分组。请逐格观察图片本身的画风、材质、光影、渲染方式和画面内容，为每组起一个简短、易辨认的中文识别名，2到6个汉字。例：亮晶晶、柔雾厚涂、写实、3D、烟雾、蓝调夜景。绝对不要使用画师姓名或作者名。不同组名称尽量不要重复；如果风格相似，结合画面内容区分。严格返回 JSON 对象，键为分组编号字符串，值为名称，例如 {"1":"亮晶晶","2":"烟雾写实"}。'},
+   {role:'user',content:'请按拼图格子左上角的编号依次命名。以下标签仅作辅助，不可代替看图：\n'+descriptions+'\n已有其他组名称（尽量避免重复）：'+allNames.join('、')+'\n请覆盖本批次全部编号。'}
+  ];
+  const out=await aiChat(msgs,{json:true,image});
+  const parsed=parseJSONLoose(out);
+  const map=parsed.names||parsed.results||parsed;
+  let saved=0;
+  for(let j=0;j<batch.length;j++){
+   const raw=map[String(j+1)]??map[j+1]??map[String(j+1)+'号'];
+   const name=String(raw||'').trim().replace(/^["'“”]+|["'“”]+$/g,'').slice(0,24);
+   if(name&&name!=='undefined'&&name!=='null'){S.meta.artistNames||={};S.meta.artistNames[batch[j].key]=name;allNames.push(name);saved++;}
+  }
+  if(saved)await saveMeta();
+  if(saved<batch.length)toast('本批次有 '+(batch.length-saved)+' 组未能识别，可稍后单独命名',5000);
+ }
+}
 async function batchNameArtistGroups() {
  if (!aiReady()) return toast('先在设置里配置文字 API');
- const rows=buildRows(S.entries).filter(r=>r.key!=='__none__');
- if (!rows.length) return toast('没有可命名的分组');
- const ok=await ask('AI 批量命名画风','将分析现有 '+rows.length+' 个分组，旧图片也包含在内。已有名称会跳过。',[{t:'取消',v:false},{t:'开始',v:true,cls:'pri'}]);
+ const rows=buildRows(S.entries).filter(r=>r.key!=='__none__'&&!S.meta.artistNames?.[r.key]);
+ if (!rows.length) return toast('没有尚未命名的分组');
+ const batches=Math.ceil(rows.length/4);
+ const ok=await ask('AI 批量命名画风','还有 '+rows.length+' 组未命名，将每 4 组拼成一张预览图，每批只发送 1 次请求，预计 '+batches+' 次请求。已有名称会跳过。',[{t:'取消',v:false},{t:'开始命名',v:true,cls:'pri'}]);
  if (!ok) return;
- for (let i=0;i<rows.length;i++){const r=rows[i];if(S.meta.artistNames?.[r.key])continue;toast('正在命名 '+(i+1)+'/'+rows.length,60000);await setArtistGroupName(r,true);}
- toast('批量命名完成'); render();
+ try{await nameArtistGroupsBatch(rows);toast('批量命名完成');render();}
+ catch(err){toast('批量命名失败：'+esc(err.message),6000);}
 }
 function openStyleNames() {
  const rows=buildRows(S.entries).filter(r=>r.key!=='__none__');
@@ -917,7 +960,8 @@ function openStyleNames() {
 }
 async function nameNewArtistGroups(entries) {
   if (!aiReady() || !entries?.length) return;
-  for (const r of buildRows(entries)) if (r.key !== '__none__' && !S.meta.artistNames?.[r.key]) await setArtistGroupName(r,true);
+  const rows=buildRows(entries).filter(r=>r.key!=='__none__'&&!S.meta.artistNames?.[r.key]);
+  if(rows.length) try{await nameArtistGroupsBatch(rows);render();}catch(err){toast('新画风命名失败：'+esc(err.message),5000);}
 }
 async function manualClassifyModal() {
   const tags = pendingTags(); if (!tags.length) return toast('没有待分类标签；已分类的画师或风格标签可直接点击标签修改');
