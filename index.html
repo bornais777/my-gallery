@@ -1280,7 +1280,7 @@ function mergeLib(L, R) {
     entries: mergeColl(L.entries, R.entries), vibes: mergeColl(L.vibes, R.vibes), folders: mergeColl(L.folders, R.folders),
     cards: mergeColl(L.cards, R.cards), boards: mergeColl(L.boards, R.boards),
     tags,
-    meta: { baseOverride: { ...(R.meta?.baseOverride || {}), ...(L.meta?.baseOverride || {}) }, keepPairs: [...new Set([...(R.meta?.keepPairs || []), ...(L.meta?.keepPairs || [])])], tombstones: tomb },
+    meta: { baseOverride: { ...(R.meta?.baseOverride || {}), ...(L.meta?.baseOverride || {}) }, artistNames: { ...(R.meta?.artistNames || {}), ...(L.meta?.artistNames || {}) }, keepPairs: [...new Set([...(R.meta?.keepPairs || []), ...(L.meta?.keepPairs || [])])], tombstones: tomb },
     blobs: { ...(R.blobs || {}), ...(L.blobs || {}) },
   };
 }
