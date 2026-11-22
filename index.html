@@ -1042,7 +1042,7 @@ async function reclassifySelected() {
   }
   const tags = [...new Set(entries.flatMap(e => (e.tokens || []).filter(t => !t.pre).map(t => t.n)).filter(Boolean))];
   if (!tags.length) return toast('所选条目没有可重新分类的标签');
-  if (!await ask('重新分类所选条目？', `将检查 ${entries.length} 条内容中的 ${tags.length} 个不同标签。已分类标签也会重新判断；同名标签在全库共用分类。原始提示词和权重不会修改。`, [{ t: '取消', v: false }, { t: '开始分类', v: true, cls: 'primary' }])) return;
+  if (!await ask('重新分类所选条目？', `将检查 ${entries.length} 条内容中的 ${tags.length} 个不同标签。已分类标签也会重新判断；同名标签在全库共用分类。原始提示词和权重不会修改。`, [{ t: '取消', v: false }, { t: '开始分类', v: true, cls: 'pri' }])) return;
   classifying = true;
   const wait = toast(`AI 正在重新分类：0 / ${tags.length} 个词…`, 600000);
   let done = 0, changed = 0;
@@ -1057,7 +1057,7 @@ async function reclassifySelected() {
       }
       done += chunk.length;
       await saveTags();
-      wait.update?.(`AI 正在重新分类：${done} / ${tags.length} 个词…`);
+      wait.textContent = `AI 正在重新分类：${done} / ${tags.length} 个词…`;
     }
     wait.remove();
     S.selected.clear(); S.selectMode = false;
