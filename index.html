@@ -2265,7 +2265,7 @@ const ACT = {
         url = `${base}/v1beta/models?key=${encodeURIComponent(st.key)}`;
       } else {
         const base = v1(st.base, st.provider === 'deepseek' ? 'https://api.deepseek.com' : 'https://api.openai.com');
-        url = base + '/models'; headers = hdr(st.key);
+        url = base + '/models'; headers = { Authorization: 'Bearer ' + st.key };
       }
       const r = await fetch(url, { method: 'GET', headers });
       if (!r.ok) throw await apiErr(r, '拉取模型失败：');
