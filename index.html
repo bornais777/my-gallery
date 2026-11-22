@@ -647,7 +647,7 @@ const fmtTime = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.ge
 const DEF = {
   text: { provider: 'openai', base: '', key: '', model: '', visionModel: '' },
   gpt: { mode: 'images', base: '', key: '', model: 'gpt-image-1', size: '1024x1536' },
-  nai: { mode: 'chami', base: 'http://chami.yyqzx.com', key: '', model: 'nai-diffusion-4-5-full', size: '832x1216', steps: 28, scale: 3.5, cfgRescale: 0, ucPreset: 2, noiseSchedule: 'karras', qualityToggle: true, sampler: 'k_euler_ancestral', neg: 'lowres, artistic error, worst quality, bad quality, jpeg artifacts, very displeasing, watermark, signature, text', quality: 'best quality, amazing quality, very aesthetic, absurdres', defaultPrompt: '' },
+  nai: { mode: 'chami', base: 'http://chami.yyqzx.com', key: '', model: 'nai-diffusion-4-5-full', size: '832x1216', steps: 28, scale: 3.5, cfgRescale: 0, ucPreset: 2, noiseSchedule: 'karras', qualityToggle: false, sampler: 'k_euler_ancestral', neg: 'lowres, artistic error, worst quality, bad quality, jpeg artifacts, very displeasing, watermark, signature, text', quality: 'best quality, amazing quality, very aesthetic, absurdres', defaultPrompt: '' },
   userName: 'User',
   models: [
     { match: 'V5|5-full|diffusion-5', label: 'V5', api: 'nai-diffusion-5-full' },
@@ -1995,7 +1995,7 @@ function entryEditor(e, { focusGen = false } = {}) {
   const isNew = !e;
   const d = e || { prompt: isNew ? SET.nai.defaultPrompt : '', negative: '', params: isNew ? { steps: SET.nai.steps, scale: SET.nai.scale, sampler: SET.nai.sampler, cfgRescale: SET.nai.cfgRescale, ucPreset: SET.nai.ucPreset, noiseSchedule: SET.nai.noiseSchedule } : {}, vibes: [], folderId: S.filters.folder && S.filters.folder !== '__none' ? S.filters.folder : '', note: '' };
   const basePrompt = e?.basePrompt ?? d.prompt;
-  const st = { vibes: structuredClone(d.vibes || []), img: null, arts: e ? artistsOf(e).map(a => ({ ...a })) : null, artsDirty: false, artsReset: false, eng: 'nai', genSeed: null, testTheme: d.testTheme || '', testTags: d.testTags || '', testOrder: d.testOrder || 'base-first', multiCharacter: d.multiCharacter === true, charPrompts: d.charPrompts || '' };
+  const st = { vibes: structuredClone(d.vibes || []), img: null, arts: e ? artistsOf(e).map(a => ({ ...a })) : null, artsDirty: false, artsReset: false, eng: 'nai', genSeed: null, testTheme: typeof SET.nai.testTheme === 'string' ? SET.nai.testTheme : (d.testTheme || ''), testTags: typeof SET.nai.testTags === 'string' ? SET.nai.testTags : (d.testTags || ''), testOrder: SET.nai.testOrder || d.testOrder || 'base-first', multiCharacter: d.multiCharacter === true, charPrompts: d.charPrompts || '' };
   const curLabel = modelLabel(d.params?.modelRaw);
   const m = openModal(`<div class="ed-head"><h3>${isNew ? '添加文字串' : '编辑'}</h3><button class="btn icon-btn ghost" data-act="close">${ic('x')}</button></div>
   <div class="ed-grid">
@@ -2026,6 +2026,40 @@ function entryEditor(e, { focusGen = false } = {}) {
   </div>
   <div class="m-actions"><button class="btn" data-act="close">取消</button><button class="btn pri" id="edSave">保存</button></div>`, { wide: true, cls: 'editor' });
   observeThumbs(m);
+  SET.nai.negPresets ||= [];
+  const negPresetPanel = '<div class="row-inline" style="margin:6px 0 10px"><select id="edNegPreset" class="inp" style="flex:1;min-width:140px"><option value="">选择负面词预设…</option></select><button class="btn xs" id="edNegPresetSave">保存当前</button><button class="btn xs ghost" id="edNegPresetDel" disabled>删除</button></div>';
+  $('#edN', m).closest('label').insertAdjacentHTML('afterend', negPresetPanel);
+  const negPresetSelect = $('#edNegPreset', m);
+  const drawNegPresets = () => {
+    const selected = negPresetSelect.value;
+    negPresetSelect.innerHTML = '<option value="">选择负面词预设…</option>' + SET.nai.negPresets.map((p, i) => '<option value="' + i + '">' + esc(p.name) + '</option>').join('');
+    if (selected !== '' && SET.nai.negPresets[+selected]) negPresetSelect.value = selected;
+    $('#edNegPresetDel', m).disabled = negPresetSelect.value === '';
+  };
+  negPresetSelect.onchange = () => {
+    const p = SET.nai.negPresets[+negPresetSelect.value];
+    if (p) $('#edN', m).value = p.text;
+    $('#edNegPresetDel', m).disabled = !p;
+  };
+  $('#edNegPresetSave', m).onclick = () => {
+    const value = $('#edN', m).value.trim();
+    if (!value) return toast('负面提示词为空，无法保存');
+    const name = window.prompt('给这个负面词预设起个名字：');
+    if (!name?.trim()) return;
+    const old = SET.nai.negPresets.find(p => p.name === name.trim());
+    if (old) old.text = value;
+    else SET.nai.negPresets.push({ name: name.trim(), text: value });
+    saveSettings(); drawNegPresets();
+    negPresetSelect.value = String(SET.nai.negPresets.findIndex(p => p.name === name.trim()));
+    $('#edNegPresetDel', m).disabled = false;
+    toast('负面词预设已保存');
+  };
+  $('#edNegPresetDel', m).onclick = async () => {
+    const i = +negPresetSelect.value; if (!SET.nai.negPresets[i]) return;
+    if (!await ask('删除这个负面词预设？', SET.nai.negPresets[i].name, [{ t: '取消', v: false }, { t: '删除', v: true, cls: 'danger' }])) return;
+    SET.nai.negPresets.splice(i, 1); saveSettings(); drawNegPresets();
+  };
+  drawNegPresets();
   $('#edN', m).closest('label').insertAdjacentHTML('afterend', '<div class="test-workbench"><div class="field"><span>通用测试方向</span><input id="edTestTheme" placeholder="例如：随机人像、电影构图、参考古典名画" value="' + esc(st.testTheme) + '"></div><div class="field"><span>AI 生成的通用提示词（Roll 只重生成这段文字）</span><textarea id="edTestTags" rows="3" placeholder="Roll 后生成 NAI 标签；不 Roll 就沿用这里的内容">' + esc(st.testTags) + '</textarea></div><div class="row-inline"><button class="btn sm" id="edRoll" ' + (aiReady() ? '' : 'disabled') + '>↻ Roll 通用提示词</button><button class="btn sm" id="edTestOrder">' + (st.testOrder === 'base-first' ? '当前顺序：正面提示词在前' : '当前顺序：通用提示词在前') + ' · 切换顺序</button></div><div class="field"><span>最终提示词预览</span><div id="edTestPreview" class="ptxt mono"></div></div></div>');
   const vbox = $('#edV', m);
   const drawVibes = () => {
@@ -2041,10 +2075,10 @@ function entryEditor(e, { focusGen = false } = {}) {
   drawVibes();
   const composePrompt = () => { const base = $('#edP', m).value.trim(), test = $('#edTestTags', m).value.trim(); return [st.testOrder === 'base-first' ? base : test, st.testOrder === 'base-first' ? test : base].filter(Boolean).join(', '); };
   const updateTestPreview = () => { $('#edTestPreview', m).textContent = composePrompt() || '（空）'; };
-  $('#edP',m).addEventListener('input', updateTestPreview); $('#edTestTags',m).addEventListener('input', updateTestPreview);
-  $('#edTestTheme',m).addEventListener('input', ev => { st.testTheme = ev.target.value; });
-  $('#edTestOrder',m).onclick = () => { st.testOrder = st.testOrder === 'base-first' ? 'test-first' : 'base-first'; $('#edTestOrder',m).textContent = (st.testOrder === 'base-first' ? '当前顺序：正面提示词在前' : '当前顺序：通用提示词在前') + ' · 切换顺序'; updateTestPreview(); };
-  $('#edRoll',m).onclick = async () => { const theme = $('#edTestTheme',m).value.trim(); if (!theme) return toast('先写一个测试方向'); if (!aiReady()) return toast('先在设置里配置文字 API'); const btn = $('#edRoll',m); btn.disabled = true; btn.classList.add('loading'); try { const out = await aiChat([{role:'system',content:'你是 NovelAI Danbooru 标签提示词生成器。把用户给出的创作方向转成可直接用于 NovelAI 的英文标签串。只输出逗号分隔的标签，不解释、不加代码块、不写画师名。内容聚焦一般人像、构图、光线、艺术风格和场景表达。'}, {role:'user',content:theme}],{json:false}); st.testTags = String(out).replace(/```[a-z]*|```/gi,'').trim().replace(/^提示词[:：]/,''); $('#edTestTags',m).value = st.testTags; updateTestPreview(); } catch(err) { toast('Roll 失败：'+esc(err.message),5000); } finally { btn.disabled = false; btn.classList.remove('loading'); } };
+  $('#edP',m).addEventListener('input', updateTestPreview); $('#edTestTags',m).addEventListener('input', ev => { SET.nai.testTags = ev.target.value; saveSettings(); updateTestPreview(); });
+  $('#edTestTheme',m).addEventListener('input', ev => { st.testTheme = ev.target.value; SET.nai.testTheme = st.testTheme; saveSettings(); });
+  $('#edTestOrder',m).onclick = () => { st.testOrder = st.testOrder === 'base-first' ? 'test-first' : 'base-first'; SET.nai.testOrder = st.testOrder; saveSettings(); $('#edTestOrder',m).textContent = (st.testOrder === 'base-first' ? '当前顺序：正面提示词在前' : '当前顺序：通用提示词在前') + ' · 切换顺序'; updateTestPreview(); };
+  $('#edRoll',m).onclick = async () => { const theme = $('#edTestTheme',m).value.trim(); if (!theme) return toast('先写一个测试方向'); if (!aiReady()) return toast('先在设置里配置文字 API'); const btn = $('#edRoll',m); btn.disabled = true; btn.classList.add('loading'); try { const out = await aiChat([{role:'system',content:'你是 NovelAI Danbooru 标签提示词生成器。把用户给出的创作方向转成可直接用于 NovelAI 的英文标签串。只输出逗号分隔的标签，不解释、不加代码块、不写画师名。内容聚焦一般人像、构图、光线、艺术风格和场景表达。'}, {role:'user',content:theme}],{json:false}); st.testTags = String(out).replace(/```[a-z]*|```/gi,'').trim().replace(/^提示词[:：]/,''); SET.nai.testTags = st.testTags; saveSettings(); $('#edTestTags',m).value = st.testTags; updateTestPreview(); } catch(err) { toast('Roll 失败：'+esc(err.message),5000); } finally { btn.disabled = false; btn.classList.remove('loading'); } };
   updateTestPreview();
 
   if (e) {
@@ -2102,7 +2136,7 @@ function entryEditor(e, { focusGen = false } = {}) {
     const ent = e || { id: uid(), createdAt: now(), source: 'text', star: false, tokens: [], params: {}, vibes: [] };
     const beforeKey = e ? groupKey(e) : null;
     const promptChanged = ent.prompt !== prompt;
-    ent.prompt = prompt; ent.basePrompt = base; ent.testTheme = $('#edTestTheme',m).value.trim(); ent.testTags = $('#edTestTags',m).value.trim(); ent.testOrder = st.testOrder; ent.multiCharacter = $('#edMulti',m).checked; ent.charPrompts = $('#edCharPrompts',m).value; ent.charPositions = $('#edCharPositions',m).value; ent.negative = $('#edN', m).value.trim();
+    ent.prompt = prompt; ent.basePrompt = base; ent.testTheme = $('#edTestTheme',m).value.trim(); ent.testTags = $('#edTestTags',m).value.trim(); ent.testOrder = st.testOrder; SET.nai.testTheme = ent.testTheme; SET.nai.testTags = ent.testTags; SET.nai.testOrder = st.testOrder; saveSettings(); ent.multiCharacter = $('#edMulti',m).checked; ent.charPrompts = $('#edCharPrompts',m).value; ent.charPositions = $('#edCharPositions',m).value; ent.negative = $('#edN', m).value.trim();
     const mv = $('#edM', m).value;
     const keepRaw = ent.params?.modelRaw && !SET.models.some(x => x.label === modelLabel(ent.params.modelRaw));
     ent.params = { ...ent.params, modelRaw: mv || (keepRaw ? ent.params.modelRaw : ''), seed: num('#edSeed'), steps: num('#edSteps'), scale: num('#edScale'), cfgRescale: num('#edCfgRescale'), sampler: $('#edSampler',m).value, noiseSchedule: $('#edNoise',m).value, ucPreset: num('#edUC'), qualityToggle: $('#edQuality',m).checked };
