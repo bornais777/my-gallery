@@ -821,7 +821,7 @@ function catOf(t) {
 function artistsOf(e) {
   if (e.artistOverride) return e.artistOverride;
   const seen = new Set(), out = [];
-  for (const t of e.tokens || []) if (catOf(t) === 'artist' && !seen.has(t.n)) { seen.add(t.n); out.push({ n: t.n, w: t.w }); }
+  for (const t of e.tokens || []) if (catOf(t) === 'artist') { const n = t.n.replace(/^artist\s+/i, '').trim(); if (n && !seen.has(n)) { seen.add(n); out.push({ n, w: t.w }); } }
   return out;
 }
 function artistStringOf(e) {
