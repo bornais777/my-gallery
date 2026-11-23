@@ -862,15 +862,17 @@ function diffEntry(e, b) {
   return { marks, removed, seed: (e.params?.seed ?? null) !== (b.params?.seed ?? null), vibe: vibeKey(e) !== vibeKey(b) };
 }
 function artistSig(e) { const a = artistsOf(e); return a.length ? a.map(x => x.n + '@' + x.w).sort().join('|') : null; }
+function negativeSig(e) { return String(e.negative || '').replace(/\\s+/g, ' ').trim(); }
+function duplicateSig(e) { const a = artistSig(e); return a ? a + '||NEG:' + negativeSig(e) : null; }
 const pairKey = (a, b) => [a.id, b.id].sort().join('|');
 function findDupFor(e) {
-  const s = artistSig(e); if (!s) return null;
-  return S.entries.find(o => o.id !== e.id && artistSig(o) === s && !S.meta.keepPairs.includes(pairKey(o, e))) || null;
+  const s = duplicateSig(e); if (!s) return null;
+  return S.entries.find(o => o.id !== e.id && duplicateSig(o) === s && !S.meta.keepPairs.includes(pairKey(o, e))) || null;
 }
 function scanDups() {
   const m = new Map(), pairs = [];
   for (const e of [...S.entries].sort((a, b) => a.createdAt - b.createdAt)) {
-    const s = artistSig(e); if (!s) continue;
+    const s = duplicateSig(e); if (!s) continue;
     if (!m.has(s)) { m.set(s, [e]); continue; }
     const first = m.get(s).find(o => !S.meta.keepPairs.includes(pairKey(o, e)));
     if (first) pairs.push([first, e]);
@@ -1965,7 +1967,7 @@ function renderArtists(main) {
 /* ================= 查重 ================= */
 function renderDups(main) {
   const P = S.dupPairs;
-  main.innerHTML = `<div class="page-h"><div><h2>查重</h2><p class="muted">画师和权重完全一样算撞了；seed 不同会标黄，可以都留；文件完全相同的单独提示。</p></div><button class="btn pri" data-act="scan-dups">${ic('dup')}扫描整个库</button></div>
+  main.innerHTML = `<div class="page-h"><div><h2>查重</h2><p class="muted">正面画师和权重、负面提示词都相同才算重复；seed 不同会标黄，可以都留；文件完全相同的单独提示。</p></div><button class="btn pri" data-act="scan-dups">${ic('dup')}扫描整个库</button></div>
   ${P == null ? emptyState('点右上角扫描') : P.length ? `<div class="dup-list">${P.map(([a, b, kind], i) => `<div class="dupitem glass">
      <div class="dthumbs">${[a, b].map(e => e.thumbId ? `<img data-blob="${e.thumbId}" alt="">` : `<span>${ic('text')}</span>`).join('')}</div>
      <div class="dinfo"><b>${esc(artistsOf(a).map(x => x.n).join(' · ') || '（无画师）')}</b>
@@ -2326,14 +2328,16 @@ async function ocrEntry(e) {
 async function checkDups(list) {
   const ids = new Set(list.filter(e => S.entries.includes(e)).map(e => e.id));
   if (!ids.size) return;
-  const groups = new Map();
+  const groups = new Map(), artistGroups = new Map();
   for (const e of S.entries) {
-    const sig = artistSig(e); if (!sig) continue;
-    if (!groups.has(sig)) groups.set(sig, []);
-    groups.get(sig).push(e);
+    const as = artistSig(e), ds = duplicateSig(e);
+    if (as) { if (!artistGroups.has(as)) artistGroups.set(as, []); artistGroups.get(as).push(e); }
+    if (ds) { if (!groups.has(ds)) groups.set(ds, []); groups.get(ds).push(e); }
   }
   const candidates = [...groups.values()].filter(g => g.length > 1 && g.some(e => ids.has(e.id)) && g.some((e,i) => g.slice(0,i).some(o => !S.meta.keepPairs.includes(pairKey(o,e)))));
+  const hasNegativeVariants = [...artistGroups.values()].some(g => g.length > 1 && g.some(e => ids.has(e.id)) && g.some((e,i) => g.slice(0,i).some(o => negativeSig(o) !== negativeSig(e))));
   if (candidates.length) await dupGroupModal(candidates);
+  if (hasNegativeVariants) toast('发现正面画师串相同、但负面提示词不同的记录：已与重复项分开，不会让你按重复项删除', 5000);
 }
 function dupGroupModal(groups) {
   return new Promise(resolve => {
