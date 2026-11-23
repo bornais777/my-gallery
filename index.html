@@ -3123,8 +3123,10 @@ function coverModal(c) {
       <label class="field"><span>画风（可选，从画谱挑一组画师串）</span><select id="cvRow">${rowOptions()}</select></label>
       <label class="field"><span>画师 / 风格标签</span><input id="cvArt" placeholder="artist:xxx, 1.2::artist:yyy::"></label>
       <label class="field"><span>角色外观与构图 <button class="btn xs" id="cvAI">${ic('wand', 12)}AI 根据描述写</button></span><textarea id="cvP" rows="6" placeholder="1girl, silver hair, red eyes, …, upper body, looking at viewer"></textarea></label>
-      <label class="field"><span>负面</span><textarea id="cvN" rows="2">${esc(SET.nai.neg)}</textarea></label>
-      <div class="f2"><label class="field"><span>配图尺寸</span><input value="832×1216（固定竖版）" disabled></label>
+      <label class="field" id="cvNegWrap"><span>负面（NAI）</span><textarea id="cvN" rows="2">${esc(SET.nai.neg)}</textarea></label>
+      <div class="seg" id="cvEng"><button data-e="nai" class="on">NAI</button><button data-e="gpt">GPT</button></div>
+      <label class="check" id="cvStyleWrap" style="display:none"><input type="checkbox" id="cvUseStyle" checked> 使用设置里保存的 GPT 画风规范</label>
+      <div class="f2" id="cvNaiOpts"><label class="field"><span>配图尺寸</span><input value="832×1216（固定竖版）" disabled></label>
       <label class="field"><span>模型</span><select id="cvM">${SET.models.filter(x => /^nai-/.test(x.api)).map(x => `<option value="${esc(x.api)}" ${x.api === SET.nai.model ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select></label></div>
       <label class="check"><input type="checkbox" id="cvSave"> 同时存进画谱</label>
     </div>
@@ -3132,7 +3134,9 @@ function coverModal(c) {
       <button class="btn pri" id="cvGen">${ic('wand')}生成</button><div class="muted sm" id="cvMsg">需要设置里的 NAI 接口</div></div>
   </div>
   <div class="m-actions"><button class="btn" data-act="close">关闭</button><button class="btn pri" id="cvSet" disabled>设为封面</button></div>`, { wide: true, cls: 'editor' });
-  const P = () => [$('#cvArt', m).value.trim(), $('#cvP', m).value.trim(), SET.nai.quality].filter(Boolean).join(', ');
+  let coverEngine = 'nai';
+  const P = () => [$('#cvArt', m).value.trim(), $('#cvP', m).value.trim(), coverEngine === 'nai' ? SET.nai.quality : ($('#cvUseStyle',m).checked ? SET.gpt.stylePrompt : '')].filter(Boolean).join(', ');
+  $('#cvEng',m).onclick = ev => { const b=ev.target.closest('[data-e]'); if(!b)return; coverEngine=b.dataset.e; $('#cvEng button',m).forEach(x=>x.classList.toggle('on',x===b)); $('#cvNaiOpts',m).style.display=coverEngine==='nai'?'':'none'; $('#cvNegWrap',m).style.display=coverEngine==='nai'?'':'none'; $('#cvStyleWrap',m).style.display=coverEngine==='gpt'?'':'none'; $('#cvMsg',m).textContent=coverEngine==='gpt'?'使用设置里的 GPT 生图接口':'使用设置里的 NAI 生图接口'; };
   $('#cvRow', m).onchange = ev => { const e = byId(ev.target.value); if (e) $('#cvArt', m).value = artistStringOf(e); };
   $('#cvAI', m).onclick = async ev => {
     const b = ev.currentTarget; b.disabled = true; b.classList.add('loading');
@@ -3144,9 +3148,9 @@ function coverModal(c) {
     if (!$('#cvP', m).value.trim()) return toast('先写外观，或点"AI 根据描述写"');
     const b = ev.currentTarget, msg = $('#cvMsg', m); b.disabled = true; b.classList.add('loading'); msg.textContent = '生成中…';
     try {
-      const r = await genNAI({ prompt: P(), negative: $('#cvN', m).value.trim(), model: $('#cvM', m).value, size: '832x1216', cfgRescale: SET.nai.cfgRescale, ucPreset: SET.nai.ucPreset, noiseSchedule: SET.nai.noiseSchedule, qualityToggle: SET.nai.qualityToggle });
-      st.blob = r.blob; st.seed = r.seed;
-      $('#cvImg', m).innerHTML = `<img src="${URL.createObjectURL(r.blob)}" class="ld" alt="">`;
+      if (coverEngine === 'gpt') { st.blob = await genGPT({ prompt: P(), size: '1024x1536' }); st.seed = null; }
+      else { const r = await genNAI({ prompt: P(), negative: $('#cvN', m).value.trim(), model: $('#cvM', m).value, size: '832x1216', cfgRescale: SET.nai.cfgRescale, ucPreset: SET.nai.ucPreset, noiseSchedule: SET.nai.noiseSchedule, qualityToggle: SET.nai.qualityToggle }); st.blob = r.blob; st.seed = r.seed; }
+      $('#cvImg', m).innerHTML = `<img src="${URL.createObjectURL(st.blob)}" class="ld" alt="">`;
       $('#cvSet', m).disabled = false; msg.textContent = '满意就点"设为封面"，不满意再点生成';
     } catch (err) { msg.textContent = '失败：' + err.message; }
     finally { b.disabled = false; b.classList.remove('loading'); }
@@ -3154,7 +3158,7 @@ function coverModal(c) {
   $('#cvSet', m).onclick = async () => {
     if (!st.blob) return;
     await setCardImage(c, st.blob); await putCard(c);
-    if ($('#cvSave', m).checked) await saveGenToLibrary(st.blob, { prompt: P(), negative: $('#cvN', m).value.trim(), seed: st.seed, model: $('#cvM', m).value, note: '角色卡封面：' + c.data.name });
+    if ($('#cvSave', m).checked) await saveGenToLibrary(st.blob, { prompt: P(), negative: coverEngine === 'nai' ? $('#cvN', m).value.trim() : '', seed: st.seed, model: coverEngine === 'nai' ? $('#cvM', m).value : 'GPT', note: '角色卡封面：' + c.data.name, size: coverEngine === 'nai' ? '832x1216' : '1024x1536' });
     closeModal(m); toast('封面已更新'); render();
   };
 }
