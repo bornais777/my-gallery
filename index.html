@@ -2169,15 +2169,15 @@ function entryEditor(e, { focusGen = false } = {}) {
     btn.disabled = true; btn.classList.add('loading'); msg.textContent = '生成中，通常要十几秒…';
     try {
       let blob, seed = null;
-      if (st.eng === 'gpt') { const gp = [prompt, $('#edUseGptStyle',m).checked ? SET.gpt.stylePrompt : ''].filter(Boolean).join('\n\n'); blob = await genGPT({ prompt: gp, size: sizeSel.value }); }
+      if (st.eng === 'gpt') { const gp = [prompt, $('#edUseGptStyle',m).checked ? SET.gpt.stylePrompt : ''].filter(Boolean).join('\n\n'); blob = await genGPT({ prompt: gp, size: sizeSel.value }); st.genModel = 'GPT'; }
       else {
-        const api = $('#edRunModel', m).value || SET.nai.model; $('#edM',m).value = api; st.genModel = api;
+        const api = $('#edRunModel', m).value || SET.nai.model; $('#edM',m).value = api;
         const vibes = [];
         for (const v of st.vibes) { const vb = S.vibes.find(x => x.id === v.vibeId); const enc = await getVibeEncoding(vb, api); if (enc) vibes.push({ enc, strength: v.strength, info: v.info }); else if (vb) toast(`vibe「${esc(vb.name)}」没有这个模型的编码，这次没带上`); }
         const charPrompts = $('#edCharPrompts',m).value.split(/\n+/).map(x=>x.trim()).filter(Boolean);
         const charPositions = $('#edCharPositions',m).value.split(/\n+/).map(line=>{ const v=line.split(',').map(Number); return v.length===2 && v.every(Number.isFinite) ? {x:clamp(v[0],0,1),y:clamp(v[1],0,1)} : null; });
         const r = await genNAI({ prompt, chars: $('#edMulti',m).checked ? charPrompts : null, charPositions: $('#edMulti',m).checked ? charPositions : null, multiCharacter: $('#edMulti',m).checked, negative: $('#edN', m).value.trim(), model: api, size: sizeSel.value, seed: num('#edSeed'), steps: num('#edSteps'), scale: num('#edScale'), cfgRescale: num('#edCfgRescale'), sampler: $('#edSampler',m).value, noiseSchedule: $('#edNoise',m).value, ucPreset: num('#edUC'), qualityToggle: $('#edQuality',m).checked, vibes });
-        blob = r.blob; seed = r.seed;
+        blob = r.blob; seed = r.seed; st.genModel = api;
       }
       st.img = { blob, source: 'gen' }; st.genSeed = seed; showImg(blob);
       if (seed != null && !$('#edSeed', m).value) $('#edSeed', m).value = seed;
