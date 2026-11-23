@@ -3186,13 +3186,13 @@ function coverModal(c) {
   const P = () => [$('#cvArt', m).value.trim(), $('#cvP', m).value.trim(), coverEngine === 'nai' ? SET.nai.quality : ($('#cvUseStyle',m).checked ? SET.gpt.stylePrompt : '')].filter(Boolean).join(', ');
   const setCoverEngine = engine => {
     coverEngine = engine;
-    $('#cvEng button',m).forEach(x => { const on = x.dataset.e === engine; x.classList.toggle('on', on); x.setAttribute('aria-pressed', String(on)); });
+    $$('#cvEng button',m).forEach(x => { const on = x.dataset.e === engine; x.classList.toggle('on', on); x.setAttribute('aria-pressed', String(on)); });
     $('#cvNaiOpts',m).style.display = engine === 'nai' ? '' : 'none';
     $('#cvNegWrap',m).style.display = engine === 'nai' ? '' : 'none';
     $('#cvStyleWrap',m).style.display = engine === 'gpt' ? '' : 'none';
     $('#cvMsg',m).textContent = engine === 'gpt' ? '使用设置里的 GPT 生图接口' : '使用设置里的 NAI 生图接口';
   };
-  $('#cvEng button',m).forEach(btn => {
+  $$('#cvEng button',m).forEach(btn => {
     btn.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); setCoverEngine(btn.dataset.e); });
   });
   $('#cvRow', m).onchange = ev => { const e = byId(ev.target.value); if (e) $('#cvArt', m).value = artistStringOf(e); };
