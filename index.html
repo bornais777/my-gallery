@@ -1039,11 +1039,11 @@ async function reclassifySelected() {
   if (!entries.length) {
     if (S.view !== 'library') { S.view = 'library'; render(); }
     S.selectMode = true; S.selected.clear(); render();
-    return toast('已进入多选模式：勾选要重新分类的条目，再点「AI 二次分类」');
+    return toast('已进入多选模式：勾选要重新分类的条目，再点「去污染」');
   }
   const tags = [...new Set(entries.flatMap(e => (e.tokens || []).filter(t => !t.pre).map(t => t.n)).filter(Boolean))];
   if (!tags.length) return toast('所选条目没有可重新分类的标签');
-  if (!await ask('重新分类所选条目？', `将检查 ${entries.length} 条内容中的 ${tags.length} 个不同标签。已分类标签也会重新判断；同名标签在全库共用分类。原始提示词和权重不会修改。`, [{ t: '取消', v: false }, { t: '开始分类', v: true, cls: 'pri' }])) return;
+  if (!await ask('对所选画师串去污染？', `将检查 ${entries.length} 条内容中的 ${tags.length} 个不同标签。已分类标签也会重新判断；同名标签在全库共用分类。原始提示词和权重不会修改。`, [{ t: '取消', v: false }, { t: '开始分类', v: true, cls: 'pri' }])) return;
   classifying = true;
   const wait = toast(`AI 正在重新分类：0 / ${tags.length} 个词…`, 600000);
   let done = 0, changed = 0;
@@ -1063,7 +1063,7 @@ async function reclassifySelected() {
     wait.remove();
     S.selected.clear(); S.selectMode = false;
     render();
-    toast(`二次分类完成：检查 ${tags.length} 个词，更新 ${changed} 个分类`);
+    toast(`去污染完成：检查 ${tags.length} 个词，更新 ${changed} 个分类`);
   } catch (err) {
     wait.remove();
     render();
@@ -1675,7 +1675,7 @@ function renderHome(main) {
   const has = new Set(rows.map(r => (r.sort[0] || '').toUpperCase()));
   main.innerHTML = `<div class="home">
     <div class="hero"><h1>画谱</h1><p>${rows.length} 组画师 · ${S.entries.length} 条串 · ${S.vibes.length} 个 vibe</p>
-      <div class="search hero-search glass">${ic('search')}<input id="homeSearch" placeholder="输入画师名或画风名，牌会转过去" autocomplete="off"></div><div class="hero-actions"><button class="btn" data-act="style-names">画风命名 / 管理</button><button class="btn pri" data-act="style-batch">AI 批量命名</button><button class="btn" data-act="reclassify-selected">${ic('wand', 15)}AI 二次分类</button></div></div>
+      <div class="search hero-search glass">${ic('search')}<input id="homeSearch" placeholder="输入画师名或画风名，牌会转过去" autocomplete="off"></div><div class="hero-actions"><button class="btn" data-act="style-names">画风命名 / 管理</button><button class="btn pri" data-act="style-batch">AI 批量命名</button><button class="btn" data-act="reclassify-selected">${ic('wand', 15)}去污染</button></div></div>
     <div class="fan" id="fan" style="--fw:${fanW()}px">${rows.map((r, i) => fanCard(r, i)).join('')}</div>
     <div class="fan-ctrl"><button class="btn icon-btn" data-act="fan-step" data-d="-1" aria-label="上一张">${ic('chev')}</button><span id="fanPos"></span><button class="btn icon-btn" data-act="fan-step" data-d="1" aria-label="下一张">${ic('chev')}</button></div>
     <div class="az glass">${letters.map(l => `<button data-act="az" data-l="${l}" ${has.has(l) ? '' : 'disabled'}>${l}</button>`).join('')}<button data-act="az" data-l="#">#</button></div>
@@ -1791,12 +1791,12 @@ function renderLibrary(main) {
     <div class="toolbar glass">
       <div class="search">${ic('search')}<input data-filter="q" value="${esc(f.q)}" placeholder="搜画师、提示词、备注" autocomplete="off"></div>
       <select data-filter="model"><option value="">全部模型</option>${models.map(m => `<option ${f.model === m ? 'selected' : ''}>${esc(m)}</option>`).join('')}</select>
-      <select data-filter="vibe"><option value="any">vibe 不限</option><option value="yes" ${f.vibe === 'yes' ? 'selected' : ''}>用了 vibe</option><option value="no" ${f.vibe === 'no' ? 'selected' : ''}>没用 vibe</option></select>
+      <select data-filter="vibe"><option value="any">vibe 不限</option><option value="yes" ${f.vibe === 'yes' ? 'selected' : ''}>用了 vibe</option><option value="no" ${f.vibe === 'no' ? 'selected' : ''}>没用 vibe</option></select><select data-filter="sort"><option value="artist" ${f.sort !== 'newest' && f.sort !== 'oldest' ? 'selected' : ''}>按画师排列</option><option value="newest" ${f.sort === 'newest' ? 'selected' : ''}>上传时间：最新</option><option value="oldest" ${f.sort === 'oldest' ? 'selected' : ''}>上传时间：最早</option></select>
       <button class="btn tgl ${f.star ? 'on' : ''}" data-act="f-star">${ic('star', 15)}喜欢</button>
       <button class="btn tgl ${f.recipe ? 'on' : ''}" data-act="f-recipe" title="只显示用了 vibe 的串，不分组">${ic('vibe', 15)}配方视图</button>
       <label class="slider" title="缩略图大小">${ic('image', 15)}<input type="range" min="140" max="380" value="${SET.thumb}" data-act-input="thumb"></label>
       ${f.recipe ? '' : `<button class="btn" data-act="expand-all">全部推开</button><button class="btn" data-act="collapse-all">全部收起</button>`}
-      <button class="btn tgl ${S.selectMode ? 'on' : ''}" data-act="select-mode">${ic('check', 15)}多选</button><button class="btn pri" data-act="reclassify-selected">${ic('wand', 15)}AI 二次分类</button><button class="btn" data-act="classify-manual">手动分类</button>
+      <button class="btn tgl ${S.selectMode ? 'on' : ''}" data-act="select-mode">${ic('check', 15)}多选</button><button class="btn pri" data-act="reclassify-selected">${ic('wand', 15)}去污染</button><button class="btn" data-act="classify-manual">手动分类</button>
     </div>
     ${f.artist ? `<div class="filter-note">只看画师 <b>${esc(f.artist)}</b><button class="btn sm" data-act="clear-artist">${ic('x', 13)}清除</button></div>` : ''}
     ${pend ? `<div class="notice glass">${ic('wand', 15)}<span>有 ${pend} 个词还没分类。分镜选取画师串时，未分类词和画面词不会自动带入；点「手动分类」可把它们归为画师、风格、通用或画面。</span>${aiReady() ? `<button class="btn sm pri" data-act="classify">让 AI 分类</button>` : `<button class="btn sm" data-act="view" data-v="settings">去填文字 API</button>`}</div>` : ''}
@@ -1807,7 +1807,7 @@ function renderLibrary(main) {
 function listHTML() {
   const list = filteredEntries();
   if (S.filters.recipe) return recipeHTML(list);
-  const rows = buildRows(list); S.rowMap = Object.fromEntries(rows.map(r => [r.id, r]));
+  const rows = buildRows(list); if (S.filters.sort === 'newest') rows.sort((a,b) => Math.max(...b.items.map(e=>e.createdAt||0))-Math.max(...a.items.map(e=>e.createdAt||0))); else if (S.filters.sort === 'oldest') rows.sort((a,b) => Math.min(...a.items.map(e=>e.createdAt||0))-Math.min(...b.items.map(e=>e.createdAt||0))); S.rowMap = Object.fromEntries(rows.map(r => [r.id, r]));
   if (!rows.length) return S.entries.length ? emptyState('没有符合筛选的串') : emptyState('还没有画师串', '用右上角的按钮添加图片或文字串');
   const html = `<div class="rows-meta muted">${rows.length} 组 · ${list.length} 条</div>` + rows.map(r => rowHTML(r)).join('');
   S.animRow = null; return html;
@@ -1913,7 +1913,7 @@ function renderBulk() {
   b.classList.add('show');
   b.innerHTML = `<span>已选 <b>${S.selected.size}</b></span>
    <button class="btn sm" data-act="sel-all">全选当前</button>
-   <button class="btn sm pri" data-act="reclassify-selected">${ic('wand', 13)}AI 二次分类</button>
+   <button class="btn sm pri" data-act="reclassify-selected">${ic('wand', 13)}去污染</button>
    <button class="btn sm" data-act="bulk-move">${ic('folder', 13)}移动</button>
    <button class="btn sm" data-act="bulk-star">${ic('star', 13)}星标</button>
    <button class="btn sm" data-act="bulk-unstar">取消星标</button>
@@ -1948,7 +1948,7 @@ function vibeCard(v, used) {
       <textarea rows="2" placeholder="备注" data-vchg="note" data-vid="${v.id}">${esc(v.note || '')}</textarea>
       <div class="vmodels">${vibeModelOpts().map(m => `<button class="mchip ${v.models?.includes(m) ? 'on' : ''}" data-act="vmodel" data-vid="${v.id}" data-m="${esc(m)}">${esc(m)}</button>`).join('')}</div>
       <div class="vuse"><b>${used.length}</b> 次使用</div>
-      ${used.length ? `<div class="vthumbs">${used.slice(0, 30).map(e => `<button data-act="jump-entry" data-id="${e.id}">${e.thumbId ? `<img data-blob="${e.thumbId}" alt="">` : ic('text')}</button>`).join('')}</div>` : ''}
+      ${used.length ? `<div class="vthumbs">${used.slice(0, 30).map(e => `<div class="vused-item"><button data-act="jump-entry" data-id="${e.id}">${e.thumbId ? `<img data-blob="${e.thumbId}" alt="">` : ic('text')}</button><button class="btn xs danger" data-act="vibe-unlink-entry" data-vid="${v.id}" data-id="${e.id}" title="解除这张图与此 Vibe 的关联">×</button></div>`).join('')}</div>` : ''}
       <div class="vact"><button class="btn xs danger" data-act="vibe-del" data-vid="${v.id}">${ic('trash', 12)}删除</button></div>
     </div></div>`;
 }
@@ -2036,7 +2036,7 @@ function entryEditor(e, { focusGen = false } = {}) {
   const isNew = !e;
   const d = e || { prompt: isNew ? SET.nai.defaultPrompt : '', negative: '', params: isNew ? { steps: SET.nai.steps, scale: SET.nai.scale, sampler: SET.nai.sampler, cfgRescale: SET.nai.cfgRescale, ucPreset: SET.nai.ucPreset, noiseSchedule: SET.nai.noiseSchedule } : {}, vibes: [], folderId: S.filters.folder && S.filters.folder !== '__none' ? S.filters.folder : '', note: '' };
   const basePrompt = e?.basePrompt ?? d.prompt;
-  const st = { vibes: structuredClone(d.vibes || []), img: null, arts: e ? artistsOf(e).map(a => ({ ...a })) : null, artsDirty: false, artsReset: false, eng: 'nai', genSeed: null, testTheme: typeof SET.nai.testTheme === 'string' ? SET.nai.testTheme : (d.testTheme || ''), testTags: typeof SET.nai.testTags === 'string' ? SET.nai.testTags : (d.testTags || ''), testOrder: SET.nai.testOrder || d.testOrder || 'base-first', multiCharacter: d.multiCharacter === true, charPrompts: d.charPrompts || '' };
+  const st = { vibes: structuredClone(d.vibes || []), img: null, arts: e ? artistsOf(e).map(a => ({ ...a })) : null, artsDirty: false, artsReset: false, eng: 'nai', genSeed: null, testTheme: e ? (d.testTheme || '') : (SET.nai.testTheme || ''), testTags: e ? (d.testTags || '') : (SET.nai.testTags || ''), testOrder: e ? (d.testOrder || 'base-first') : (SET.nai.testOrder || 'base-first'), multiCharacter: d.multiCharacter === true, charPrompts: d.charPrompts || '' };
   const curLabel = modelLabel(d.params?.modelRaw);
   const m = openModal(`<div class="ed-head"><h3>${isNew ? '添加文字串' : '编辑'}</h3><button class="btn icon-btn ghost" data-act="close">${ic('x')}</button></div>
   <div class="ed-grid">
@@ -2564,6 +2564,7 @@ const ACT = {
   vmodel: async el => { const v = S.vibes.find(x => x.id === el.dataset.vid); if (!v) return; const m = el.dataset.m; v.models = v.models?.includes(m) ? v.models.filter(x => x !== m) : [...(v.models || []), m]; await putVibe(v); el.classList.toggle('on'); },
   'vibe-del': async el => { const v = S.vibes.find(x => x.id === el.dataset.vid); if (!v) return; if (!await ask(`删除 vibe「${esc(v.name)}」？`, '用过它的图会变回空心方块。', [{ t: '取消', v: false }, { t: '删除', v: true, cls: 'danger' }])) return; await deleteVibe(v.id); markDirty(); render(); },
   'jump-entry': el => jumpToEntry(el.dataset.id),
+  'vibe-unlink-entry': async el => { const e=byId(el.dataset.id); if(!e) return; if(!await ask('解除这张图片的 Vibe 关联？','只会移除这张图片与当前 Vibe 的关联，不删除图片本身。',[{t:'取消',v:false},{t:'解除关联',v:true,cls:'danger'}])) return; e.vibes=(e.vibes||[]).filter(x=>x.vibeId!==el.dataset.vid); await putEntry(e); markDirty(); render(); toast('已解除关联'); },
   hsel: el => { const id = el.dataset.id; S.hsel.has(id) ? S.hsel.delete(id) : S.hsel.add(id); el.classList.toggle('on'); const b = $('[data-act="hlink"]'); if (b) b.textContent = `把选中的 ${S.hsel.size || ''} 张关联过去`; },
   hlink: async () => { const vid = $('#hvibe')?.value; if (!vid || !S.hsel.size) return toast('先勾选图'); let n = 0; for (const id of S.hsel) { const e = byId(id); const slot = e?.vibes?.findIndex(v => !v.vibeId); if (e && slot >= 0) { await linkSlot(e, slot, vid); n++; } } S.hsel.clear(); toast(`已关联 ${n} 张`); render(); },
 
