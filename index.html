@@ -221,12 +221,13 @@ select:focus,.inp:focus,.field input:focus,.field textarea:focus{border-color:va
 .meta-grid span{color:var(--ink3)} .meta-grid b{font-weight:550;word-break:break-all}
 .note{font-size:12.5px;padding:8px 10px;border-radius:10px;background:var(--accent-soft);white-space:pre-wrap}
 .xp-act{display:flex;flex-wrap:wrap;gap:5px}
-.recipe{display:flex;flex-direction:column;gap:14px;align-items:stretch}
-.recipe-row{padding:12px;border-radius:var(--r2)}
+.recipe{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--tw)),1fr));gap:14px;align-items:start}
+.recipe-row{padding:12px;border-radius:var(--r2);min-width:0}
+.recipe-row.open{grid-column:1/-1}
 .recipe-head{display:flex;align-items:center;gap:10px;margin:0 2px 10px}
 .recipe-head .row-names{flex:1;min-width:0}
 .recipe-stack{display:flex;align-items:flex-start;padding:2px 4px 14px;min-height:40px}
-.recipe-stack .card{flex:0 0 var(--tw);width:var(--tw)}
+.recipe-stack .card{flex:1 1 auto;width:100%;min-width:0}
 .recipe-open-track{display:flex;align-items:flex-start;gap:14px;overflow-x:auto;padding:4px 4px 12px;scrollbar-width:thin}
 .recipe-open-track .card{flex:0 0 var(--tw);width:var(--tw)}
 .empty{padding:40px 20px;text-align:center;border-radius:var(--r);color:var(--ink2);display:flex;flex-direction:column;gap:6px;align-items:center;grid-column:1/-1}
@@ -842,7 +843,7 @@ function artistStringOf(e) {
   const artists = artistsOf(e);
   return artists.map(a => `artist:${a.n}${a.w !== 1 ? `::${a.w}` : ''}`).join(', ');
 }
-function groupKey(e) { const a = [...new Set(artistsOf(e).map(x => x.n))].sort(); return a.length ? a.join(' | ') : '__none__'; }
+function groupKey(e) { const a = [...new Set(artistsOf(e).map(x => x.n))].sort(); return a.length ? a.join(' | ') : '__none__:' + e.id; }
 function buildRows(list) {
   const m = new Map();
   for (const e of list) { const k = groupKey(e); if (!m.has(k)) m.set(k, []); m.get(k).push(e); }
@@ -851,8 +852,9 @@ function buildRows(list) {
     const ov = S.meta.baseOverride[key];
     const base = items.find(x => x.id === ov) || items[0];
     const rest = items.filter(x => x !== base);
-    const names = key === '__none__' ? [] : artistsOf(base).map(a => a.n);
-    return { key, id: 'r' + hashStr(key), base, rest, items: [base, ...rest], names, sort: key === '__none__' ? '\uffff' : (names[0] || '\uffff') };
+    const noArtist = key.startsWith('__none__:');
+    const names = noArtist ? [] : artistsOf(base).map(a => a.n);
+    return { key, id: 'r' + hashStr(key), base, rest, items: [base, ...rest], names, sort: noArtist ? '\uffff' : (names[0] || '\uffff') };
   });
   rows.sort((a, b) => a.sort.localeCompare(b.sort) || a.key.localeCompare(b.key));
   return rows;
@@ -2260,11 +2262,12 @@ async function ingestFile(file) {
   e.origId = uid(); e.thumbId = uid(); e.fileHash = hash; e.dims = { w: th.w, h: th.h };
   await putBlob(e.origId, file, 'orig'); await putBlob(e.thumbId, th.blob, 'thumb');
   if (meta) {
-    e.prompt = meta.prompt; e.negative = meta.negative || ''; e.chars = meta.chars || []; e.params = meta.params || {};
+    e.prompt = String(meta.prompt || '').trim(); e.negative = meta.negative || ''; e.chars = meta.chars || []; e.params = meta.params || {};
     e.vibes = (meta.vibes || []).map(v => ({ ...v, vibeId: v.sig ? (S.vibes.find(x => x.sigs?.includes(v.sig))?.id || null) : null }));
     e.tokens = tokenize(e.prompt);
   }
-  await putEntry(e);
+  // 没有可用正面提示词的图片暂存给后续 OCR；在确认前不写入 entries。
+  if (e.prompt) await putEntry(e);
   return { entry: e };
 }
 async function addImages(files) {
@@ -2322,12 +2325,24 @@ async function addImages(files) {
   if (added.length) toast(`读到 ${added.length} 张图的参数`);
   render();
   if (noMeta.length) {
-    const ok = await ask(`有 ${noMeta.length} 张没读到参数`, aiReady() ? '看起来是截图。要用 AI 把图里的文字识别成提示词吗？识别完可以再手改。' : '看起来是截图。在设置里填好能看图的文字 API 后可以自动识别，现在先只存图。',
-      aiReady() ? [{ t: '先只存图', v: false }, { t: 'AI 识别', v: true, cls: 'pri' }] : [{ t: '知道了', v: false, cls: 'pri' }]);
+    const ok = await ask(`有 ${noMeta.length} 张图片没有解析出提示词`, aiReady() ? '这些图片暂不入库。可以选择用 AI 识别图片里的文字；只有成功识别出非空提示词后才会保存。' : '这些图片暂不入库。需要先在设置里配置支持看图的文字 API，之后重新上传并选择 AI 识别。',
+      aiReady() ? [{ t: '不入库', v: false }, { t: 'AI 识别后入库', v: true, cls: 'pri' }] : [{ t: '不入库', v: false, cls: 'pri' }]);
+    const discardStaged = async e => {
+      for (const id of [e.origId, e.thumbId]) if (id) { urlCache.delete(id); await DB.del('blobs', id); }
+    };
     if (ok) {
       const t2 = toast('', 600000);
-      for (let i = 0; i < noMeta.length; i++) { t2.textContent = `AI 识别截图 ${i + 1} / ${noMeta.length}…`; try { await ocrEntry(noMeta[i]); added.push(noMeta[i]); } catch (err) { toast('识别失败：' + esc(err.message), 5000); } }
+      for (let i = 0; i < noMeta.length; i++) {
+        const e = noMeta[i]; t2.textContent = `AI 识别图片 ${i + 1} / ${noMeta.length}…`;
+        try {
+          await ocrEntry(e);
+          if (e.prompt.trim()) added.push(e);
+          else { await discardStaged(e); toast('有图片未识别出有效提示词，未入库', 4000); }
+        } catch (err) { await discardStaged(e); toast('识别失败，图片未入库：' + esc(err.message), 5000); }
+      }
       t2.remove(); render();
+    } else {
+      for (const e of noMeta) await discardStaged(e);
     }
   }
   await classifyPending();
