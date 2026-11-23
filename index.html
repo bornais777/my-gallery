@@ -3441,8 +3441,6 @@ async function startQueue(b, onlyIds) {
   Object.assign(QU, { running: true, pause: false, boardId: b.id, done: 0, total: b.shots.filter(s => s.status === 'pending').length });
   if (b.fixedSeed && b.seed == null) b.seed = Math.floor(Math.random() * 4294967295);
   await putBoard(b);
-  let vibes = [];
-  if (b.vibeId) { const vb = S.vibes.find(v => v.id === b.vibeId); const enc = await getVibeEncoding(vb, b.model || SET.nai.model); if (enc) vibes = [{ enc, strength: b.vibeStrength ?? 0.6, info: 1 }]; else if (vb) toast(`vibe「${esc(vb.name)}」没有这个模型的编码，这次不带 vibe`, 4000); }
   renderQueuePill(); updateAllShots(b);
   try {
     while (!QU.pause) {
@@ -3450,6 +3448,8 @@ async function startQueue(b, onlyIds) {
       if (!S.boards.includes(b)) break;
       s.status = 'run'; s.err = ''; QU.cur = s.id; updateShotUI(b, s);
       const pr = shotPrompt(b, s);
+      let vibes = [];
+      if (b.vibeId) { const vb = S.vibes.find(v => v.id === b.vibeId); const enc = await getVibeEncoding(vb, s.model || b.model || SET.nai.model); if (enc) vibes = [{ enc, strength: b.vibeStrength ?? 0.6, info: 1 }]; else if (vb) toast(`vibe「${esc(vb.name)}」没有这个模型的编码，这次不带 vibe`, 4000); }
       let ok = false;
       for (let attempt = 0; attempt < 2 && !ok; attempt++) {
         try {
@@ -3582,7 +3582,7 @@ function shotHTML(b, s, i) {
 async function saveShot(b, s, folderId) {
   if (!s.imgId || s.savedId) return;
   const blob = await getBlob(s.imgId); if (!blob) return;
-  const e = { id: uid(), createdAt: now(), source: 'gen', star: false, prompt: s.prompt || shotPrompt(b, s).prompt, negative: b.negative, chars: s.charPrompts || [], params: { seed: s.seed ?? null, steps: s.steps ?? b.steps ?? SET.nai.steps, scale: s.scale ?? b.scale ?? SET.nai.scale, cfgRescale: s.cfgRescale ?? b.cfgRescale ?? SET.nai.cfgRescale ?? 0, sampler: s.sampler || b.sampler || SET.nai.sampler, noiseSchedule: s.noiseSchedule || b.noiseSchedule || SET.nai.noiseSchedule, ucPreset: s.ucPreset ?? b.ucPreset ?? SET.nai.ucPreset, qualityToggle: s.qualityToggle ?? b.qualityToggle ?? SET.nai.qualityToggle, modelRaw: s.model || b.model }, vibes: b.vibeId ? [{ vibeId: b.vibeId, strength: b.vibeStrength, info: 1, sig: null }] : [], tokens: [], folderId: folderId || '', note: `分镜「${b.title || ''}」第 ${b.shots.indexOf(s) + 1} 镜：${s.cn}` };
+  const e = { id: uid(), createdAt: now(), source: 'gen', star: false, prompt: s.prompt || shotPrompt(b, s).prompt, negative: b.negative, chars: s.charPrompts || [], params: { seed: s.seed ?? null, steps: s.steps ?? b.steps ?? SET.nai.steps, scale: s.scale ?? b.scale ?? SET.nai.scale, cfgRescale: s.cfgRescale ?? b.cfgRescale ?? SET.nai.cfgRescale ?? 0, sampler: s.sampler || b.sampler || SET.nai.sampler, noiseSchedule: s.noiseSchedule || b.noiseSchedule || SET.nai.noiseSchedule, ucPreset: s.ucPreset ?? b.ucPreset ?? SET.nai.ucPreset, qualityToggle: s.qualityToggle ?? b.qualityToggle ?? SET.nai.qualityToggle, modelRaw: s.model || b.model || SET.nai.model }, vibes: b.vibeId ? [{ vibeId: b.vibeId, strength: b.vibeStrength, info: 1, sig: null }] : [], tokens: [], folderId: folderId || '', note: `分镜「${b.title || ''}」第 ${b.shots.indexOf(s) + 1} 镜：${s.cn}` };
   e.tokens = tokenize(e.prompt); e.origId = s.imgId; e.thumbId = s.thumbId;
   const th = await getBlob(s.thumbId); const bmp = await createImageBitmap(blob); e.dims = { w: bmp.width, h: bmp.height }; bmp.close?.(); void th;
   e.fileHash = await sha256(await blob.arrayBuffer());
