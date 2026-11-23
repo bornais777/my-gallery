@@ -646,7 +646,7 @@ const fmtTime = t => { const d = new Date(t); return `${d.getMonth() + 1}/${d.ge
 /* ================= 设置（只存本机，不同步） ================= */
 const DEF = {
   text: { provider: 'openai', base: '', key: '', model: '', visionModel: '' },
-  gpt: { mode: 'images', base: '', key: '', model: 'gpt-image-1', chamiModel: 'gpt-image-2', size: '1024x1536' },
+  gpt: { mode: 'images', base: '', key: '', model: 'gpt-image-1', chamiModel: 'gpt-image-2', size: '1024x1536', stylePrompt: '' },
   nai: { mode: 'chami', base: 'http://chami.yyqzx.com', key: '', model: 'nai-diffusion-4-5-full', size: '832x1216', steps: 28, scale: 3.5, cfgRescale: 0, ucPreset: 2, noiseSchedule: 'karras', qualityToggle: false, sampler: 'k_euler_ancestral', neg: 'lowres, artistic error, worst quality, bad quality, jpeg artifacts, very displeasing, watermark, signature, text', quality: 'best quality, amazing quality, very aesthetic, absurdres', defaultPrompt: '' },
   userName: 'User',
   models: [
@@ -2009,6 +2009,7 @@ function renderSettings(main) {
      ${fld('gpt.model', '通用 GPT 模型名', 'gpt-image-1')}
      <label class="field"><span>茶蘼 GPT 模型</span><select data-set="gpt.chamiModel"><option value="gpt-image-2" ${(SET.gpt.chamiModel || 'gpt-image-2') === 'gpt-image-2' ? 'selected' : ''}>gpt-image-2</option><option value="gpt-image-2.5" ${SET.gpt.chamiModel === 'gpt-image-2.5' ? 'selected' : ''}>gpt-image-2.5</option></select></label>
      <p class="muted sm">茶蘼 GPT 使用 /GPTimage/chami/v1/chat/completions，必须 stream=true；模型可选 gpt-image-2 或 gpt-image-2.5。错误不会自动重试。</p>
+     <label class="field"><span>GPT 画风规范（自然语言，各处 GPT 生图共用）</span><textarea rows="3" data-set="gpt.stylePrompt" placeholder="例如：自然、克制的光影，细腻材质，避免过度锐化……">${esc(SET.gpt.stylePrompt || '')}</textarea></label>
      ${sel('gpt.size', '尺寸', [['1024x1536', '1024×1536 竖'], ['1536x1024', '1536×1024 横'], ['1024x1024', '1024×1024 方']])}
    </section>
    <section class="scard glass"><h3>${ic('rows')}模型名映射<span class="muted">V5 出来时在这里加一行，不用改代码</span></h3>
@@ -2059,6 +2060,7 @@ function entryEditor(e, { focusGen = false } = {}) {
       <button class="btn sm" id="edUp">${ic('image', 13)}上传图</button>
       <div class="gen-box">
         <div class="seg" id="edEng"><button data-e="nai" class="on">NAI</button><button data-e="gpt">GPT</button></div>
+        <label class="check" id="edGptStyleWrap" style="display:none"><input type="checkbox" id="edUseGptStyle" checked> 使用设置里保存的 GPT 画风规范</label>
         <select id="edSize"></select>
         <label class="field" id="edRunModelWrap"><span>本次 NAI 模型</span><select id="edRunModel" title="本次生图模型"></select></label>
         <button class="btn pri" id="edGen">${ic('wand')}生图</button>
@@ -2139,9 +2141,9 @@ function entryEditor(e, { focusGen = false } = {}) {
     const def = st.eng === 'nai' ? SET.nai.size : SET.gpt.size;
     sizeSel.innerHTML = opts.map(([k, t]) => `<option value="${k}" ${k === def ? 'selected' : ''}>${t}</option>`).join('');
   };
-  $('#edEng', m).onclick = ev => { const b = ev.target.closest('[data-e]'); if (!b) return; st.eng = b.dataset.e; $('#edEng button', m).forEach(x => x.classList.toggle('on', x === b)); drawSizes(); $('#edRunModelWrap',m).style.display=st.eng==='nai'?'':'none'; };
+  $('#edEng', m).onclick = ev => { const b = ev.target.closest('[data-e]'); if (!b) return; st.eng = b.dataset.e; $('#edEng button', m).forEach(x => x.classList.toggle('on', x === b)); drawSizes(); $('#edRunModelWrap',m).style.display=st.eng==='nai'?'':'none'; $('#edGptStyleWrap',m).style.display=st.eng==='gpt'?'':'none'; };
   drawSizes();
-  $('#edRunModelWrap',m).style.display=st.eng==='nai'?'':'none';
+  $('#edRunModelWrap',m).style.display=st.eng==='nai'?'':'none'; $('#edGptStyleWrap',m).style.display=st.eng==='gpt'?'':'none';
   const runModelSel = $('#edRunModel',m);
   runModelSel.innerHTML = SET.models.filter(x => /^nai-/.test(x.api)).map(x => `<option value="${esc(x.api)}">${esc(x.label)}</option>`).join('');
   runModelSel.value = $('#edM',m).value || d.params?.modelRaw || SET.nai.model;
@@ -2161,7 +2163,7 @@ function entryEditor(e, { focusGen = false } = {}) {
     btn.disabled = true; btn.classList.add('loading'); msg.textContent = '生成中，通常要十几秒…';
     try {
       let blob, seed = null;
-      if (st.eng === 'gpt') blob = await genGPT({ prompt, size: sizeSel.value });
+      if (st.eng === 'gpt') { const gp = [prompt, $('#edUseGptStyle',m).checked ? SET.gpt.stylePrompt : ''].filter(Boolean).join('\n\n'); blob = await genGPT({ prompt: gp, size: sizeSel.value }); }
       else {
         const api = $('#edRunModel', m).value || SET.nai.model; $('#edM',m).value = api;
         const vibes = [];
