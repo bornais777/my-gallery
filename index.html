@@ -278,7 +278,7 @@ select:focus,.inp:focus,.field input:focus,.field textarea:focus{border-color:va
 .dinfo{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
 .dinfo b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dinfo .tag-y{align-self:flex-start}
-.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0}
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0}.dup-groups{display:flex;flex-direction:column;gap:16px;max-height:65vh;overflow:auto}.dup-group{padding:12px;border:1px solid var(--line);border-radius:16px;background:var(--field)}.dup-row{display:flex;gap:12px;overflow-x:auto;padding:8px 2px}.dup-item{flex:0 0 150px;display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid var(--line);border-radius:12px;background:var(--glass2)}.dup-item img{width:100%;height:170px;object-fit:contain;border-radius:8px;background:var(--field)}.dup-item label{display:flex;align-items:center;gap:6px;font-size:12px}.dup-item input{accent-color:var(--danger)}
 .dside{display:flex;flex-direction:column;gap:9px;min-width:0}
 .dlabel{font-size:12px;font-weight:650;color:var(--ink2)}
 .dimg{aspect-ratio:2/3;max-height:340px;border-radius:14px;overflow:hidden;background:var(--field);display:grid;place-items:center}
@@ -2060,6 +2060,7 @@ function entryEditor(e, { focusGen = false } = {}) {
       <div class="gen-box">
         <div class="seg" id="edEng"><button data-e="nai" class="on">NAI</button><button data-e="gpt">GPT</button></div>
         <select id="edSize"></select>
+        <select id="edRunModel" title="本次生图模型"></select>
         <button class="btn pri" id="edGen">${ic('wand')}生图</button>
         <div class="muted sm" id="edGenMsg">生成的图会在保存时一起存进库里</div>
       </div>
@@ -2140,10 +2141,16 @@ function entryEditor(e, { focusGen = false } = {}) {
   };
   $('#edEng', m).onclick = ev => { const b = ev.target.closest('[data-e]'); if (!b) return; st.eng = b.dataset.e; $$('#edEng button', m).forEach(x => x.classList.toggle('on', x === b)); drawSizes(); };
   drawSizes();
+  const runModelSel = $('#edRunModel',m);
+  runModelSel.innerHTML = SET.models.filter(x => /^nai-/.test(x.api)).map(x => `<option value="${esc(x.api)}">${esc(x.label)}</option>`).join('');
+  runModelSel.value = $('#edM',m).value || d.params?.modelRaw || SET.nai.model;
+  if (!runModelSel.value) runModelSel.value = SET.nai.model;
+  $('#edM',m).addEventListener('change',()=>{ if ($('#edM',m).value) runModelSel.value=$('#edM',m).value; });
   $('.f4',m).insertAdjacentHTML('afterend', '<details class="gparams"><summary>高级 NAI 参数</summary><div class="f3"><label class="field"><span>CFG Rescale</span><input id="edCfgRescale" type="number" min="0" max="1" step="0.05" value="' + (d.params?.cfgRescale ?? SET.nai.cfgRescale ?? 0) + '"></label><label class="field"><span>采样器</span><select id="edSampler"><option value="k_euler_ancestral">Euler Ancestral</option><option value="k_euler">Euler</option><option value="k_dpmpp_2s_ancestral">DPM++ 2S Ancestral</option><option value="k_dpmpp_2m">DPM++ 2M</option><option value="k_dpmpp_sde">DPM++ SDE</option></select></label><label class="field"><span>噪声调度</span><select id="edNoise"><option value="karras">Karras</option><option value="exponential">Exponential</option><option value="polyexponential">Polyexponential</option></select></label></div><div class="f2"><label class="field"><span>UC 预设</span><select id="edUC"><option value="0">Heavy</option><option value="1">Light</option><option value="2">Furry focus</option><option value="3">Human focus</option><option value="4">None</option></select></label><label class="check"><input type="checkbox" id="edQuality" ' + ((d.params?.qualityToggle ?? SET.nai.qualityToggle) !== false ? 'checked' : '') + '> 使用质量词开关</label></div><label class="check"><input type="checkbox" id="edMulti" ' + (st.multiCharacter ? 'checked' : '') + '> 多角色分离提示词</label><label class="field"><span>角色提示词（多角色模式，每行一个角色）</span><textarea id="edCharPrompts" rows="3" placeholder="girl, silver hair, blue eyes&#10;boy, black hair, red eyes">' + esc(st.charPrompts) + '</textarea></label></details>');
   $('#edSampler',m).value = d.params?.sampler || SET.nai.sampler || 'k_euler_ancestral'; $('#edNoise',m).value = d.params?.noiseSchedule || SET.nai.noiseSchedule || 'karras'; $('#edUC',m).value = String(d.params?.ucPreset ?? SET.nai.ucPreset ?? 2);
   $('#edCharPrompts',m).closest('.field').insertAdjacentHTML('afterend','<label class="field"><span>角色位置（每行 x,y；0–1，留空自动）</span><textarea id="edCharPositions" rows="2" placeholder="0.3,0.5&#10;0.7,0.5">'+esc(d.charPositions || '')+'</textarea></label>');
-  const showImg = blob => { const u = URL.createObjectURL(blob); $('#edImg', m).innerHTML = `<img src="${u}" class="ld" alt="">`; };
+  const showImg = blob => { const u = URL.createObjectURL(blob); $('#edImg', m).innerHTML = `<img src="${u}" class="ld" alt="">`; $('#edImg',m).dataset.fullsrc=u; $('#edImg',m).style.cursor="zoom-in"; };
+  $('#edImg',m).onclick = () => { const src=$('#edImg',m).dataset.fullsrc; if(!src) return; openModal(`<div style="max-height:80vh;display:grid;place-items:center"><img src="${src}" style="max-width:100%;max-height:78vh;object-fit:contain;border-radius:12px"></div><div class="m-actions"><button class="btn" data-act="close">关闭</button></div>`,{wide:true}); };
   $('#edUp', m).onclick = () => pickFile('image/*', false, async fs => { if (!fs[0]) return; st.img = { blob: fs[0], source: null }; showImg(fs[0]); });
   const num = id => { const v = $(id, m).value; return v === '' ? null : +v; };
 
@@ -2155,7 +2162,7 @@ function entryEditor(e, { focusGen = false } = {}) {
       let blob, seed = null;
       if (st.eng === 'gpt') blob = await genGPT({ prompt, size: sizeSel.value });
       else {
-        const api = $('#edM', m).value || SET.nai.model;
+        const api = $('#edRunModel', m).value || SET.nai.model;
         const vibes = [];
         for (const v of st.vibes) { const vb = S.vibes.find(x => x.id === v.vibeId); const enc = await getVibeEncoding(vb, api); if (enc) vibes.push({ enc, strength: v.strength, info: v.info }); else if (vb) toast(`vibe「${esc(vb.name)}」没有这个模型的编码，这次没带上`); }
         const charPrompts = $('#edCharPrompts',m).value.split(/\n+/).map(x=>x.trim()).filter(Boolean);
@@ -2315,20 +2322,53 @@ async function ocrEntry(e) {
   await putEntry(e);
 }
 async function checkDups(list) {
-  for (const e of list) {
-    if (!S.entries.includes(e)) continue;
-    const o = findDupFor(e); if (o) await dupModal(o, e);
+  const ids = new Set(list.filter(e => S.entries.includes(e)).map(e => e.id));
+  if (!ids.size) return;
+  const groups = new Map();
+  for (const e of S.entries) {
+    const sig = artistSig(e); if (!sig) continue;
+    if (!groups.has(sig)) groups.set(sig, []);
+    groups.get(sig).push(e);
   }
+  const candidates = [...groups.values()].filter(g => g.length > 1 && g.some(e => ids.has(e.id)) && g.some((e,i) => g.slice(0,i).some(o => !S.meta.keepPairs.includes(pairKey(o,e)))));
+  if (candidates.length) await dupGroupModal(candidates);
+}
+function dupGroupModal(groups) {
+  return new Promise(resolve => {
+    const groupHtml = groups.map((g, gi) => {
+      const label = artistsOf(g[0]).map(a => a.n).join(' · ') || '相同画师串';
+      return `<section class="dup-group"><b>${esc(label)}</b><span class="muted sm"> · ${g.length} 张 · 勾选要删除的图片</span><div class="dup-row">${g.map(e => `<div class="dup-item"><div class="dlabel">${fmtTime(e.createdAt)} · ${esc(SRC[e.source] || '')}</div>${e.thumbId ? `<img data-blob="${e.thumbId}" alt="">` : '<div class="dimg">无图</div>'}<label><input type="checkbox" data-dupg="${gi}" data-delid="${e.id}">删除这张</label><span class="muted sm">Seed：${esc(e.params?.seed ?? '—')} · Steps：${esc(e.params?.steps ?? '—')}</span><span class="muted sm">Sampler：${esc(e.params?.sampler || '—')}</span></div>`).join('')}</div></section>`;
+    }).join('');
+    const m = openModal(`<h3>批量检查相同画师串</h3><p class="muted">相同画师串已按组横向排列。勾选要删除的图片；删除前会把星标、备注、vibe 关联和文件夹合并到保留图片。每组至少保留一张。</p><div class="dup-groups">${groupHtml}</div><div class="m-actions"><button class="btn" data-act="close">取消</button><button class="btn pri" id="dupGroupApply">应用删除选择</button></div>`,{wide:true});
+    observeThumbs(m);
+    $('#dupGroupApply',m).onclick = async () => {
+      for (let gi=0; gi<groups.length; gi++) {
+        const g=groups[gi], checked=$('[data-dupg="'+gi+'"]:checked',m).map(x=>x.dataset.delid);
+        const drops=g.filter(e=>checked.includes(e.id));
+        if(drops.length>=g.length) drops.pop();
+        const keeps=g.filter(e=>!drops.includes(e));
+        const keep=keeps[0] || g[0];
+        for(const drop of drops) if(S.entries.some(x=>x.id===drop.id)) await mergeInto(keep,drop);
+        const survivors=g.filter(e=>S.entries.some(x=>x.id===e.id));
+        for(let i=0;i<survivors.length;i++) for(let j=i+1;j<survivors.length;j++) {
+          const a=survivors[i],b=survivors[j];
+          if(!S.meta.keepPairs.includes(pairKey(a,b))) S.meta.keepPairs.push(pairKey(a,b));
+        }
+      }
+      await saveMeta(); closeModal(m); render(); toast('批量重复项处理完成');
+    };
+  });
 }
 function dupModal(a, b) {
   return new Promise(res => {
-    const seedDiff = (a.params?.seed ?? null) !== (b.params?.seed ?? null);
+    const fields = [['模型','modelRaw'],['Seed','seed'],['Steps','steps'],['Scale','scale'],['CFG Rescale','cfgRescale'],['Sampler','sampler'],['噪声调度','noiseSchedule'],['UC 预设','ucPreset'],['质量词','qualityToggle'],['宽度','width'],['高度','height']];
+    const diff = Object.fromEntries(fields.map(([k,f])=>[f,(a.params?.[f] ?? null)!==(b.params?.[f] ?? null)]));
     const side = (e, label) => `<div class="dside"><div class="dlabel">${label} · ${fmtTime(e.createdAt)} · ${SRC[e.source] || ''}</div>
       <div class="dimg">${e.thumbId ? `<img data-blob="${e.thumbId}" alt="">` : '<span class="muted">没有图</span>'}</div>
       <div class="chips">${compTokens(e).map(t => `<span class="chip mono ${t.c}">${esc(t.n)}${t.w !== 1 ? `<i>${t.w}</i>` : ''}</span>`).join('')}</div>
-      <table class="ptable">${[['模型', entryModel(e)], ['Seed', e.params?.seed, seedDiff], ['Steps', e.params?.steps], ['Scale', e.params?.scale], ['Sampler', e.params?.sampler], ['Vibe', (e.vibes || []).map(v => (S.vibes.find(x => x.id === v.vibeId)?.name || '□') + ' ' + v.strength).join('，') || '无'], ['星标', e.star ? '★' : ''], ['备注', e.note]].map(([k, v, hl]) => `<tr class="${hl ? 'hl' : ''}"><td>${k}</td><td>${esc(v ?? '—') || '—'}</td></tr>`).join('')}</table>
+      <table class="ptable">${fields.map(([k,f])=>`<tr class="${diff[f] ? 'hl' : ''}"><td>${k}</td><td>${esc(f==='modelRaw'?entryModel(e):(e.params?.[f] ?? '—'))}</td></tr>`).join('')}${[['Vibe',(e.vibes || []).map(v => (S.vibes.find(x => x.id === v.vibeId)?.name || '□') + ' ' + v.strength).join('，') || '无'],['星标',e.star?'★':''],['备注',e.note]].map(([k,v])=>`<tr><td>${k}</td><td>${esc(v ?? '—')}</td></tr>`).join('')}</table>
       <p class="ptxt sm">${esc(e.prompt)}</p></div>`;
-    const m = openModal(`<h3>这两条撞了</h3><p class="muted">画师和权重完全相同。${seedDiff ? '<span class="tag-y">seed 不同</span> 可以都留。' : ''}删掉的那条，星标、备注、vibe 关联、文件夹会合并到留下的那条。</p>
+    const m = openModal(`<h3>这两条撞了</h3><p class="muted">画师和权重完全相同。黄色行表示参数不同；删除时会合并星标、备注、vibe 关联和文件夹。</p>
       <div class="dgrid">${side(a, '左')}${side(b, '右')}</div>
       <div class="m-actions"><button class="btn danger" data-k="L">删左</button><button class="btn danger" data-k="R">删右</button><button class="btn pri" data-k="K">都留</button></div>`, { wide: true });
     m._resolve = res;
