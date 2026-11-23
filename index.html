@@ -2597,7 +2597,7 @@ const ACT = {
     } }]);
   },
   'f-star': () => { S.filters.star = !S.filters.star; render(); },
-  'f-recipe': () => { S.filters.recipe = !S.filters.recipe; render(); },
+  'f-recipe': () => { S.filters.recipe = !S.filters.recipe; if (S.filters.recipe) S.filters.vibe = 'any'; render(); },
   'clear-artist': () => { S.filters.artist = ''; render(); },
   'expand-all': () => { Object.values(S.rowMap).forEach(r => r.items.length > 1 && S.expanded.add(r.key)); refreshList(); },
   'collapse-all': () => { S.expanded.clear(); refreshList(); },
@@ -2662,7 +2662,8 @@ async function moveTo(list, fid) { for (const e of list) { e.folderId = fid; awa
 
 /* ================= 事件 ================= */
 document.addEventListener('click', ev => {
-  if (S.suppressClick) { ev.preventDefault(); ev.stopPropagation(); return; }
+  // 拖动图片后抑制误触；弹窗内按钮不应被全局拖动状态拦截。
+  if (S.suppressClick && !ev.target.closest('#modals .mask')) { ev.preventDefault(); ev.stopPropagation(); return; }
   const fm = $('#fabMenu'); if (fm?.classList.contains('show') && !ev.target.closest('.fab')) fm.classList.remove('show');
   const el = ev.target.closest('[data-act]'); if (!el || el.disabled) return;
   const fn = ACT[el.dataset.act]; if (fn) fn(el, ev);
@@ -2672,8 +2673,8 @@ document.addEventListener('pointerdown', ev => {
   if (ev.target.closest('input,textarea,select,.xp')) return;
   const sx = ev.clientX, sl = tr.scrollLeft; let moved = false;
   const mv = e => { const dx = e.clientX - sx; if (!moved && Math.abs(dx) > 6) { moved = true; tr.classList.add('dragging'); } if (moved) tr.scrollLeft = sl - dx; };
-  const up = () => { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); tr.classList.remove('dragging'); if (moved) { S.suppressClick = true; setTimeout(() => S.suppressClick = false, 0); } };
-  document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up);
+  const up = () => { document.removeEventListener('pointermove', mv); document.removeEventListener('pointerup', up); document.removeEventListener('pointercancel', up); tr.classList.remove('dragging'); if (moved) { S.suppressClick = true; setTimeout(() => S.suppressClick = false, 0); } };
+  document.addEventListener('pointermove', mv); document.addEventListener('pointerup', up); document.addEventListener('pointercancel', up);
 });
 document.addEventListener('change', ev => {
   const t = ev.target;
@@ -3179,9 +3180,9 @@ function coverModal(c) {
       <label class="check"><input type="checkbox" id="cvSave"> 同时存进画谱</label>
     </div>
     <div class="ed-side"><div class="ed-img" id="cvImg">${c.thumbId ? `<img data-blob="${c.thumbId}" alt="">` : `<span class="muted">${ic('image', 28)}<br>还没有封面</span>`}</div>
-      <button class="btn pri" id="cvGen">${ic('wand')}生成</button><div class="muted sm" id="cvMsg">需要设置里的 NAI 接口</div></div>
+      <button type="button" class="btn pri" id="cvGen">${ic('wand')}生成</button><div class="muted sm" id="cvMsg">NAI 使用 NAI 生图接口；GPT 使用 GPT 生图接口</div></div>
   </div>
-  <div class="m-actions"><button class="btn" data-act="close">关闭</button><button class="btn pri" id="cvSet" disabled>设为封面</button></div>`, { wide: true, cls: 'editor' });
+  <div class="m-actions"><button type="button" class="btn" data-act="close">关闭</button><button type="button" class="btn pri" id="cvSet" disabled>设为封面</button></div>`, { wide: true, cls: 'editor' });
   let coverEngine = 'nai';
   const P = () => [$('#cvArt', m).value.trim(), $('#cvP', m).value.trim(), coverEngine === 'nai' ? SET.nai.quality : ($('#cvUseStyle',m).checked ? SET.gpt.stylePrompt : '')].filter(Boolean).join(', ');
   const setCoverEngine = engine => {
@@ -3190,21 +3191,32 @@ function coverModal(c) {
     $('#cvNaiOpts',m).style.display = engine === 'nai' ? '' : 'none';
     $('#cvNegWrap',m).style.display = engine === 'nai' ? '' : 'none';
     $('#cvStyleWrap',m).style.display = engine === 'gpt' ? '' : 'none';
-    $('#cvMsg',m).textContent = engine === 'gpt' ? '使用设置里的 GPT 生图接口' : '使用设置里的 NAI 生图接口';
+    $('#cvMsg',m).textContent = engine === 'gpt'
+      ? (SET.gpt.key ? '已切换 GPT；使用设置里的 GPT 生图接口' : '已切换 GPT，但尚未填写 GPT 生图 API Key')
+      : (SET.nai.key ? '已选择 NAI 生图' : '尚未填写 NAI 生图 API Key');
   };
   $$('#cvEng button',m).forEach(btn => {
     btn.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); setCoverEngine(btn.dataset.e); });
   });
   $('#cvRow', m).onchange = ev => { const e = byId(ev.target.value); if (e) $('#cvArt', m).value = artistStringOf(e); };
   $('#cvAI', m).onclick = async ev => {
-    const b = ev.currentTarget; b.disabled = true; b.classList.add('loading');
-    try { const j = await aiAppearance(`角色名：${c.data.name}\n${c.data.description}\n${c.data.personality}\n${c.data.scenario}`); $('#cvP', m).value = [j.tags, j.cover].filter(Boolean).join(', '); }
-    catch (err) { toast('AI 失败：' + esc(err.message), 5000); }
+    const b = ev.currentTarget, msg = $('#cvMsg', m); b.disabled = true; b.classList.add('loading');
+    msg.textContent = SET.text.key ? '正在调用文字 AI 整理角色外观…' : '需要先在设置里填写文字 API 的 Key；GPT 生图 Key 不能代替文字 API';
+    try {
+      const j = await aiAppearance(`角色名：${c.data.name}\n${c.data.description}\n${c.data.personality}\n${c.data.scenario}`);
+      $('#cvP', m).value = [j.tags, j.cover].filter(Boolean).join(', ');
+      msg.textContent = '角色外观已生成，可以检查后生图';
+    } catch (err) { msg.textContent = '外观生成失败：' + err.message; }
     finally { b.disabled = false; b.classList.remove('loading'); }
   };
   $('#cvGen', m).onclick = async ev => {
-    if (!$('#cvP', m).value.trim()) return toast('先写外观，或点"AI 根据描述写"');
-    const b = ev.currentTarget, msg = $('#cvMsg', m); b.disabled = true; b.classList.add('loading'); msg.textContent = '生成中…';
+    if (!$('#cvP', m).value.trim()) { $('#cvMsg', m).textContent = '先填写角色外观，或点「AI 根据描述写」'; return; }
+    const b = ev.currentTarget, msg = $('#cvMsg', m); b.disabled = true; b.classList.add('loading');
+    if ((coverEngine === 'gpt' && !SET.gpt.key) || (coverEngine === 'nai' && !SET.nai.key)) {
+      msg.textContent = coverEngine === 'gpt' ? '请先在设置里填写 GPT 生图 API Key' : '请先在设置里填写 NAI 生图 API Key';
+      b.disabled = false; b.classList.remove('loading'); return;
+    }
+    msg.textContent = coverEngine === 'gpt' ? '正在调用 GPT 生图…' : '正在调用 NAI 生图…';
     try {
       if (coverEngine === 'gpt') { st.blob = await genGPT({ prompt: P(), size: '1024x1536' }); st.seed = null; }
       else { const r = await genNAI({ prompt: P(), negative: $('#cvN', m).value.trim(), model: $('#cvM', m).value, size: '832x1216', cfgRescale: SET.nai.cfgRescale, ucPreset: SET.nai.ucPreset, noiseSchedule: SET.nai.noiseSchedule, qualityToggle: SET.nai.qualityToggle }); st.blob = r.blob; st.seed = r.seed; }
@@ -3393,6 +3405,19 @@ const SHOT_MODES = {
       { k: '收束尾格', why: '用留白、背影或环境变化收住这一段', cam: 'wide shot, negative space, atmospheric manga panel', o: 'landscape' },
     ],
   },
+  comic: {
+    name: '漫画分格', desc: '按漫画阅读节奏拆成连续分格：建立场景、人物动作、反应特写、关键细节和情绪/动作收尾。每个镜头生成一张独立分格，不把整页拼在一张图里。',
+    beats: [
+      { k: '开场大格', why: '交代场景、人物和气氛，建立空间', cam: 'wide shot, establishing shot, manga panel composition', o: 'landscape' },
+      { k: '人物入场', why: '明确人物站位和与环境的关系', cam: 'full body, dynamic composition, manga panel', o: 'portrait' },
+      { k: '动作推进', why: '用清晰的动作姿态推动事件发生', cam: 'dynamic pose, action lines, foreshortening', o: 'landscape' },
+      { k: '反应特写', why: '切到人物眼神、表情或身体反应', cam: 'close-up, face focus, expressive eyes', o: 'portrait' },
+      { k: '关键细节', why: '突出手部、道具、线索或造成转折的物件', cam: 'extreme close-up, object focus, dramatic lighting', o: 'square' },
+      { k: '对话/对峙', why: '用正反打或双人构图表现关系和冲突', cam: 'two shot, over the shoulder, eye contact', o: 'landscape' },
+      { k: '情绪停顿', why: '留一格安静画面，让情绪或信息沉淀', cam: 'still pose, negative space, quiet atmosphere', o: 'portrait' },
+      { k: '收尾冲击格', why: '用有张力的构图结束这一段，留下悬念或余韵', cam: 'dramatic angle, dynamic composition, strong silhouette', o: 'landscape' },
+    ],
+  },
   custom: { name: '自定义', desc: '用你自己的话写镜头要求，AI 按你的要求挑景别和机位。', beats: [] },
 };
 const SIZES = { landscape: '1216x832', portrait: '832x1216', square: '1024x1024' };
@@ -3450,7 +3475,7 @@ function shotPrompt(b, s) {
 function storySys(b) {
   const md = SHOT_MODES[b.mode] || SHOT_MODES.film, n = clamp(+b.count || 6, 1, 12);
   const beats = md.beats.length ? md.beats.map(x => `- ${x.k}：${x.why}｜参考标签：${x.cam}｜画幅：${x.o}`).join('\n') : `用户的镜头要求：${b.custom || '（未填写，按故事需要自由安排景别和机位）'}`;
-  const modeExtra = b.mode === 'comic' ? '\n漫画模式补充：每个镜头只生成一张独立漫画分格，不要把多个格子拼成整页；通过景别、画幅和构图变化模拟漫画分格节奏。画面中不要生成可读文字、对白或水印，给对白气泡预留适当留白。' : '';
+  const modeExtra = b.mode === 'comic' ? '\n漫画模式补充：按漫画阅读顺序安排分格，兼顾建立镜头、动作连续性、反应镜头、细节插格和节奏停顿；相邻分格要有明确的景别或构图变化。每个镜头只生成一张独立漫画分格，不要把多个格子拼成整页。画面中不要生成可读文字、对白、拟声词或水印；对话场景在人物附近预留干净留白，后续可自行添加气泡。不要让所有镜头都变成大头特写。' : '';
   return `你是动画分镜师兼 NovelAI 提示词工程师。把用户的故事拆成正好 ${n} 个镜头，用电影和动画的视觉语言讲故事，并为每个镜头写 NAI（Danbooru 风格）标签。
 
 镜头模式：${md.name}——${md.desc}${modeExtra}
