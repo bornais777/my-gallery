@@ -221,8 +221,14 @@ select:focus,.inp:focus,.field input:focus,.field textarea:focus{border-color:va
 .meta-grid span{color:var(--ink3)} .meta-grid b{font-weight:550;word-break:break-all}
 .note{font-size:12.5px;padding:8px 10px;border-radius:10px;background:var(--accent-soft);white-space:pre-wrap}
 .xp-act{display:flex;flex-wrap:wrap;gap:5px}
-.recipe{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--tw),1fr));gap:14px;align-items:start}
-.recipe .card{width:auto}
+.recipe{display:flex;flex-direction:column;gap:14px;align-items:stretch}
+.recipe-row{padding:12px;border-radius:var(--r2)}
+.recipe-head{display:flex;align-items:center;gap:10px;margin:0 2px 10px}
+.recipe-head .row-names{flex:1;min-width:0}
+.recipe-stack{display:flex;align-items:flex-start;padding:2px 4px 14px;min-height:40px}
+.recipe-stack .card{flex:0 0 var(--tw);width:var(--tw)}
+.recipe-open-track{display:flex;align-items:flex-start;gap:14px;overflow-x:auto;padding:4px 4px 12px;scrollbar-width:thin}
+.recipe-open-track .card{flex:0 0 var(--tw);width:var(--tw)}
 .empty{padding:40px 20px;text-align:center;border-radius:var(--r);color:var(--ink2);display:flex;flex-direction:column;gap:6px;align-items:center;grid-column:1/-1}
 .empty p{font-size:13px;color:var(--ink3)}
 
@@ -1777,7 +1783,6 @@ function jumpToEntry(eid) {
 function filteredEntries() {
   const f = S.filters, q = normTag(f.q || '');
   return S.entries.filter(e => {
-    if (f.recipe && !e.vibes?.length) return false;
     if (f.star && !e.star) return false;
     if (f.vibe === 'yes' && !e.vibes?.length) return false;
     if (f.vibe === 'no' && e.vibes?.length) return false;
@@ -1841,7 +1846,7 @@ function cardHTML(e, { r = null, base = null, isBase = false, rowOpen = false, i
   const po = S.openPrompts.has(e.id), sel = S.selected.has(e.id);
   const multi = r && r.items.length > 1;
   const stacked = isBase && multi && !rowOpen;
-  const imgAct = S.selectMode ? 'sel' : recipe ? 'lightbox' : (isBase && multi) ? 'row' : 'prompt';
+  const imgAct = S.selectMode ? 'sel' : recipeToggle ? 'recipe-row' : recipe ? 'lightbox' : (isBase && multi) ? 'row' : 'prompt';
   return `<article class="card ${po ? 'open' : ''} ${stacked ? 'stacked' : ''} ${sel ? 'sel' : ''}" data-id="${e.id}" style="--ar:${aspectOf(e)};--i:${i}">
     <div class="img" data-act="${imgAct}" data-id="${e.id}" data-rid="${r?.id || ''}">
       ${e.thumbId ? `<img data-blob="${e.thumbId}" alt="" draggable="false">` : `<div class="noimg"><span class="muted">${ic('image', 24)}</span><div class="noimg-b"><button class="btn sm" data-act="uploadimg" data-id="${e.id}">上传图</button><button class="btn sm" data-act="genfor" data-id="${e.id}">${ic('wand', 13)}生图</button></div></div>`}
@@ -1906,8 +1911,18 @@ function xpHTML(e, isBase, r) {
   </div>`;
 }
 function recipeHTML(list) {
-  if (!list.length) return emptyState('还没有用了 vibe 的串');
-  return `<div class="rows-meta muted">${list.length} 条用了 vibe · 点图看大图</div><div class="recipe">${[...list].sort((a, b) => b.createdAt - a.createdAt).map(e => cardHTML(e, { recipe: true })).join('')}</div>`;
+  if (!list.length) return emptyState('没有符合筛选的画师串');
+  const rows = buildRows(list);
+  if (S.filters.sort === 'newest') rows.sort((a,b) => Math.max(...b.items.map(e=>e.createdAt||0))-Math.max(...a.items.map(e=>e.createdAt||0)));
+  else if (S.filters.sort === 'oldest') rows.sort((a,b) => Math.min(...a.items.map(e=>e.createdAt||0))-Math.min(...b.items.map(e=>e.createdAt||0)));
+  S.rowMap = Object.fromEntries(rows.map(r => [r.id, r]));
+  return `<div class="rows-meta muted">${list.length} 条画师串 · ${rows.length} 组；同组默认叠放，点击某组展开成独立一行</div><div class="recipe">${rows.map(r => {
+    const open = S.expanded.has(r.key);
+    return `<section class="recipe-row glass" data-row="${r.id}">
+      <header class="recipe-head"><div class="row-names">${r.names.length ? `<span class="rn">${esc(artistGroupLabel(r))}</span>` : '<span class="muted">没有识别到画师</span>'}</div><span class="count">${r.items.length} 条</span>${r.items.length > 1 ? `<button class="btn sm ghost" data-act="recipe-row" data-rid="${r.id}">${open ? '收起这一组' : '展开这一组'}</button>` : ''}</header>
+      ${open ? `<div class="recipe-open-track">${r.items.map((e,i) => cardHTML(e,{r,base:r.base,isBase:e===r.base,recipe:true,i})).join('')}</div>` : `<div class="recipe-stack">${cardHTML(r.base,{r,isBase:true,recipe:true,recipeToggle:true})}</div>`}
+    </section>`;
+  }).join('')}</div>`;
 }
 function folderBar() {
   const f = S.filters.folder;
@@ -2534,6 +2549,11 @@ const ACT = {
   az: el => { const L = el.dataset.l; const i = S.homeRows.findIndex(r => L === '#' ? !/^[a-z]/i.test(r.sort) : r.sort[0]?.toUpperCase() === L); if (i >= 0) fanTo(i); },
   'pop-go': el => { closeModal(); jumpToRow(el.dataset.rid, el.dataset.id); },
 
+  'recipe-row': el => {
+    const r = S.rowMap[el.dataset.rid]; if (!r || r.items.length < 2) return;
+    if (S.expanded.has(r.key)) S.expanded.delete(r.key); else S.expanded.add(r.key);
+    refreshList();
+  },
   row: el => {
     const r = S.rowMap[el.dataset.rid]; if (!r || r.items.length < 2) return;
     if (S.expanded.has(r.key)) S.expanded.delete(r.key); else { S.expanded.add(r.key); S.animRow = r.key; }
@@ -3150,9 +3170,9 @@ function coverModal(c) {
     <div class="ed-main">
       <label class="field"><span>画风（可选，从画谱挑一组画师串）</span><select id="cvRow">${rowOptions()}</select></label>
       <label class="field"><span>画师 / 风格标签</span><input id="cvArt" placeholder="artist:xxx, 1.2::artist:yyy::"></label>
-      <label class="field"><span>角色外观与构图 <button class="btn xs" id="cvAI">${ic('wand', 12)}AI 根据描述写</button></span><textarea id="cvP" rows="6" placeholder="1girl, silver hair, red eyes, …, upper body, looking at viewer"></textarea></label>
+      <div class="field"><span>角色外观与构图</span><button type="button" class="btn xs" id="cvAI">${ic('wand', 12)}AI 根据描述写</button><textarea id="cvP" rows="6" placeholder="1girl, silver hair, red eyes, …, upper body, looking at viewer"></textarea></div>
       <label class="field" id="cvNegWrap"><span>负面（NAI）</span><textarea id="cvN" rows="2">${esc(SET.nai.neg)}</textarea></label>
-      <div class="seg" id="cvEng"><button type="button" data-e="nai" class="on">NAI</button><button type="button" data-e="gpt">GPT</button></div>
+      <div class="seg" id="cvEng"><button type="button" data-e="nai" class="on" aria-pressed="true">NAI</button><button type="button" data-e="gpt" aria-pressed="false">GPT</button></div>
       <label class="check" id="cvStyleWrap" style="display:none"><input type="checkbox" id="cvUseStyle" checked> 使用设置里保存的 GPT 画风规范</label>
       <div class="f2" id="cvNaiOpts"><label class="field"><span>配图尺寸</span><input value="832×1216（固定竖版）" disabled></label>
       <label class="field"><span>模型</span><select id="cvM">${SET.models.filter(x => /^nai-/.test(x.api)).map(x => `<option value="${esc(x.api)}" ${x.api === SET.nai.model ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select></label></div>
@@ -3166,7 +3186,7 @@ function coverModal(c) {
   const P = () => [$('#cvArt', m).value.trim(), $('#cvP', m).value.trim(), coverEngine === 'nai' ? SET.nai.quality : ($('#cvUseStyle',m).checked ? SET.gpt.stylePrompt : '')].filter(Boolean).join(', ');
   const setCoverEngine = engine => {
     coverEngine = engine;
-    $('#cvEng button',m).forEach(x => x.classList.toggle('on', x.dataset.e === engine));
+    $('#cvEng button',m).forEach(x => { const on = x.dataset.e === engine; x.classList.toggle('on', on); x.setAttribute('aria-pressed', String(on)); });
     $('#cvNaiOpts',m).style.display = engine === 'nai' ? '' : 'none';
     $('#cvNegWrap',m).style.display = engine === 'nai' ? '' : 'none';
     $('#cvStyleWrap',m).style.display = engine === 'gpt' ? '' : 'none';
@@ -3359,6 +3379,20 @@ const SHOT_MODES = {
       { k: '夜景收尾', why: '城市灯光下的小小身影', cam: 'wide shot, night, city lights, from behind', o: 'landscape' },
     ],
   },
+  comic: {
+    name: '漫画分镜', desc: '按漫画叙事节奏拆成连续的单格画面：建立场景、人物登场、对话互动、反应特写、关键细节和跨页式高潮。每个镜头单独生成一格，不把多格拼成整页。',
+    beats: [
+      { k: '场景建立格', why: '用横向大格交代地点、时间和气氛', cam: 'wide shot, establishing shot, cinematic composition, manga panel', o: 'landscape' },
+      { k: '人物登场格', why: '用全身或半身构图让角色进入画面', cam: 'full body, character introduction, manga panel', o: 'portrait' },
+      { k: '对话双人格', why: '两人同框，明确视线、距离和站位', cam: 'two-shot, facing each other, eye contact, manga panel', o: 'landscape' },
+      { k: '对白反应格', why: '用脸部近景表现听到台词后的反应', cam: 'close-up, reaction shot, expressive face, manga panel', o: 'portrait' },
+      { k: '动作过程格', why: '用倾斜构图和速度线表现动作方向', cam: 'dynamic angle, motion lines, dynamic pose, manga panel', o: 'landscape' },
+      { k: '关键细节格', why: '突出手、道具、线索或决定性细节', cam: 'extreme close-up, object focus, manga panel', o: 'square' },
+      { k: '情绪特写格', why: '放大眼神、表情和情绪转折', cam: 'extreme close-up, dramatic expression, manga panel', o: 'portrait' },
+      { k: '高潮大格', why: '用单格大构图承载故事最重要的瞬间', cam: 'dramatic wide composition, dynamic perspective, splash panel', o: 'landscape' },
+      { k: '收束尾格', why: '用留白、背影或环境变化收住这一段', cam: 'wide shot, negative space, atmospheric manga panel', o: 'landscape' },
+    ],
+  },
   custom: { name: '自定义', desc: '用你自己的话写镜头要求，AI 按你的要求挑景别和机位。', beats: [] },
 };
 const SIZES = { landscape: '1216x832', portrait: '832x1216', square: '1024x1024' };
@@ -3416,9 +3450,10 @@ function shotPrompt(b, s) {
 function storySys(b) {
   const md = SHOT_MODES[b.mode] || SHOT_MODES.film, n = clamp(+b.count || 6, 1, 12);
   const beats = md.beats.length ? md.beats.map(x => `- ${x.k}：${x.why}｜参考标签：${x.cam}｜画幅：${x.o}`).join('\n') : `用户的镜头要求：${b.custom || '（未填写，按故事需要自由安排景别和机位）'}`;
+  const modeExtra = b.mode === 'comic' ? '\n漫画模式补充：每个镜头只生成一张独立漫画分格，不要把多个格子拼成整页；通过景别、画幅和构图变化模拟漫画分格节奏。画面中不要生成可读文字、对白或水印，给对白气泡预留适当留白。' : '';
   return `你是动画分镜师兼 NovelAI 提示词工程师。把用户的故事拆成正好 ${n} 个镜头，用电影和动画的视觉语言讲故事，并为每个镜头写 NAI（Danbooru 风格）标签。
 
-镜头模式：${md.name}——${md.desc}
+镜头模式：${md.name}——${md.desc}${modeExtra}
 可用镜头（按叙事需要挑选、排序，可以重复同一种；相邻镜头的景别或机位要有变化）：
 ${beats}
 
