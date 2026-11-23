@@ -183,7 +183,7 @@ select:focus,.inp:focus,.field input:focus,.field textarea:focus{border-color:va
 @media (hover:none){.lb-btn{opacity:.9}}
 .selbox{position:absolute;right:8px;bottom:8px;width:24px;height:24px;border-radius:8px;background:rgba(255,255,255,.85);border:2px solid var(--accent);display:grid;place-items:center;color:var(--accent)}
 .body{padding:10px 11px 11px;display:flex;flex-direction:column;gap:7px}
-.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chips{display:flex;flex-wrap:wrap;gap:4px}.chip-toggle{align-self:center;white-space:nowrap;padding:2px 7px;font-size:11px}
 .chip{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:8px;font-size:12px;line-height:1.35;background:rgba(127,118,150,.12);color:var(--ink);cursor:pointer;border:1px solid transparent;max-width:100%;word-break:break-word;text-align:left}
 .chip.artist{font-weight:650}
 .chip.style{font-style:italic}
@@ -676,7 +676,7 @@ const S = {
   meta: { baseOverride: {}, keepPairs: [], tombstones: {} },
   view: sessionStorage.getItem('huapu.view') || 'home',
   filters: { q: '', model: '', vibe: 'any', star: false, folder: '', recipe: false, artist: '' },
-  expanded: new Set(), openPrompts: new Set(), selected: new Set(), hsel: new Set(),
+  expanded: new Set(), openPrompts: new Set(), tagChipsOpen: new Set(), selected: new Set(), hsel: new Set(),
   selectMode: false, homeFocus: 0, homeRows: [], rowMap: {}, dupPairs: null,
   dirty: false, syncing: false, syncMsg: '', lastSync: +localStorage.getItem('huapu.lastSync') || 0,
   animRow: null, pop: null, lb: null,
@@ -1851,7 +1851,7 @@ function cardHTML(e, { r = null, base = null, isBase = false, rowOpen = false, i
       ${S.selectMode ? `<span class="selbox">${sel ? ic('check', 14) : ''}</span>` : ''}
     </div>
     <div class="body">
-      <div class="chips">${chipsHTML(e, d, isBase || recipe || !base)}</div>
+      <div class="chips">${chipsHTML(e, d, isBase || recipe || !base, e.id)}</div>
       ${d && d.removed.length ? `<div class="removed">${d.removed.map(t => `<s>${esc(t.n)}${t.w !== 1 ? ' ' + t.w : ''}</s>`).join('')}</div>` : ''}
       ${vtagsHTML(e, d)}
       <div class="card-foot"><span class="muted">${esc(entryModel(e) || SRC[e.source] || '')}${e.note ? ' · ' + ic('edit', 11) : ''}</span><button class="btn xs ghost" data-act="prompt" data-id="${e.id}">${po ? '收起' : '提示词'}</button></div>
@@ -1859,14 +1859,18 @@ function cardHTML(e, { r = null, base = null, isBase = false, rowOpen = false, i
     </div>
   </article>`;
 }
-function chipsHTML(e, d, mono) {
+function chipsHTML(e, d, mono, entryId = null) {
   const toks = d ? d.marks : compTokens(e).map(t => ({ ...t, st: 'same' }));
   if (!toks.length) return `<span class="muted sm">${e.prompt ? '还没认出画师' : '空串'}</span>`;
-  return toks.map(t => {
+  const canCollapse = !!entryId && toks.length > 5;
+  const isOpen = !canCollapse || S.tagChipsOpen.has(entryId);
+  const shown = isOpen ? toks : toks.slice(0, 5);
+  const html = shown.map(t => {
     const hl = !mono && t.st !== 'same';
     const w = t.st === 'w' && !mono ? `<i>${t.bw}→${t.w}</i>` : t.w !== 1 ? `<i>${t.w}</i>` : '';
     return `<span class="chip ${t.c} ${hl ? 'hl' : 'mono'}" data-act="tokmenu" data-n="${esc(t.n)}">${esc(t.n)}${w}</span>`;
   }).join('');
+  return html + (canCollapse ? `<button class="btn xs ghost chip-toggle" data-act="tag-chips-toggle" data-id="${entryId}">${isOpen ? '收起标签' : `展开 +${toks.length - 5}`}</button>` : '');
 }
 function vtagsHTML(e, d) {
   if (!e.vibes?.length) return '';
@@ -2537,6 +2541,7 @@ const ACT = {
     row.outerHTML = rowHTML(r); S.animRow = null; observeThumbs($(`.row[data-row="${r.id}"]`));
   },
   prompt: el => { const id = el.dataset.id; S.openPrompts.has(id) ? S.openPrompts.delete(id) : S.openPrompts.add(id); refreshCardRow(id); },
+  'tag-chips-toggle': el => { const id = el.dataset.id; S.tagChipsOpen.has(id) ? S.tagChipsOpen.delete(id) : S.tagChipsOpen.add(id); refreshCardRow(id); },
   sel: el => { const id = el.dataset.id; S.selected.has(id) ? S.selected.delete(id) : S.selected.add(id); el.closest('.card').classList.toggle('sel'); const sb = $('.selbox', el); if (sb) sb.innerHTML = S.selected.has(id) ? ic('check', 14) : ''; renderBulk(); },
   star: async el => { const e = byId(el.dataset.id); if (!e) return; e.star = !e.star; await putEntry(e); el.classList.toggle('on', e.star); if (S.filters.star) refreshList(); },
   lightbox: el => { const ids = lbIdsFor(el); openLightbox(ids, ids.indexOf(el.dataset.id)); },
