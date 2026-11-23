@@ -277,7 +277,7 @@ select:focus,.inp:focus,.field input:focus,.field textarea:focus{border-color:va
 .dinfo{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
 .dinfo b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dinfo .tag-y{align-self:flex-start}
-.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0}.dup-groups{display:flex;flex-direction:column;gap:16px;max-height:65vh;overflow:auto}.dup-group{padding:12px;border:1px solid var(--line);border-radius:16px;background:var(--field)}.dup-row{display:flex;gap:12px;overflow-x:auto;padding:8px 2px}.dup-item{flex:0 0 150px;display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid var(--line);border-radius:12px;background:var(--glass2)}.dup-item img{width:100%;height:170px;object-fit:contain;border-radius:8px;background:var(--field)}.dup-item label{display:flex;align-items:center;gap:6px;font-size:12px}.dup-item input{accent-color:var(--danger)}
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:14px 0}.dup-groups{display:flex;flex-direction:column;gap:16px;max-height:65vh;overflow:auto}.dup-group{padding:12px;border:1px solid var(--line);border-radius:16px;background:var(--field)}.dup-row{display:flex;gap:12px;overflow-x:auto;padding:8px 2px}.dup-item{flex:0 0 150px;display:flex;flex-direction:column;gap:6px;padding:8px;border:1px solid var(--line);border-radius:12px;background:var(--glass2)}.dup-item img{width:100%;height:170px;object-fit:contain;border-radius:8px;background:var(--field)}.dup-item label{display:flex;align-items:center;gap:6px;font-size:12px}.dup-item input{accent-color:var(--danger)}.dup-params{display:flex;flex-direction:column;gap:3px;max-height:190px;overflow:auto}.dup-param{font-size:11px;line-height:1.4;color:var(--ink2);padding:2px 4px;border-radius:4px;overflow-wrap:anywhere}.dup-param.hl{background:var(--yellow-soft);color:var(--ink)}
 .dside{display:flex;flex-direction:column;gap:9px;min-width:0}
 .dlabel{font-size:12px;font-weight:650;color:var(--ink2)}
 .dimg{aspect-ratio:2/3;max-height:340px;border-radius:14px;overflow:hidden;background:var(--field);display:grid;place-items:center}
@@ -774,8 +774,13 @@ async function blobURL(id) {
 /* ================= 模型名映射 ================= */
 function modelLabel(raw) {
   if (!raw) return '';
-  for (const m of SET.models) { try { if (new RegExp(m.match, 'i').test(raw)) return m.label; } catch { } }
-  return raw;
+  const value = String(raw);
+  // 4.5 的模型 ID 中包含“4-5-full”，不能被宽泛的 V5/5-full 规则抢先识别。
+  if (/nai-diffusion-4-5-curated/i.test(value)) return 'V4.5 Curated';
+  if (/nai-diffusion-4-5-full/i.test(value)) return 'V4.5';
+  if (/nai-diffusion-5-full/i.test(value)) return 'V5';
+  for (const m of SET.models) { try { if (new RegExp(m.match, 'i').test(value)) return m.label; } catch { } }
+  return value;
 }
 const entryModel = e => modelLabel(e.params?.modelRaw);
 const modelApi = label => SET.models.find(m => m.label === label)?.api || label;
@@ -2339,11 +2344,25 @@ async function checkDups(list) {
   if (candidates.length) await dupGroupModal(candidates);
   if (hasNegativeVariants) toast('发现正面画师串相同、但负面提示词不同的记录：已与重复项分开，不会让你按重复项删除', 5000);
 }
+const DUP_PARAM_FIELDS = [['模型','modelRaw'],['Seed','seed'],['Steps','steps'],['Scale','scale'],['CFG Rescale','cfgRescale'],['Sampler','sampler'],['噪声调度','noiseSchedule'],['UC 预设','ucPreset'],['质量词','qualityToggle'],['宽度','width'],['高度','height']];
+function dupParamValue(e, field) {
+  if (field === 'modelRaw') return entryModel(e) || '—';
+  const value = e.params?.[field];
+  if (field === 'qualityToggle') return value == null ? '—' : value ? '开' : '关';
+  return value == null || value === '' ? '—' : String(value);
+}
 function dupGroupModal(groups) {
   return new Promise(resolve => {
     const groupHtml = groups.map((g, gi) => {
       const label = artistsOf(g[0]).map(a => a.n).join(' · ') || '相同画师串';
-      return `<section class="dup-group"><b>${esc(label)}</b><span class="muted sm"> · ${g.length} 张 · 勾选要删除的图片</span><div class="dup-row">${g.map(e => `<div class="dup-item"><div class="dlabel">${fmtTime(e.createdAt)} · ${esc(SRC[e.source] || '')}</div>${e.thumbId ? `<img data-blob="${e.thumbId}" alt="">` : '<div class="dimg">无图</div>'}<label><input type="checkbox" data-dupg="${gi}" data-delid="${e.id}">删除这张</label><span class="muted sm">Seed：${esc(e.params?.seed ?? '—')} · Steps：${esc(e.params?.steps ?? '—')}</span><span class="muted sm">Sampler：${esc(e.params?.sampler || '—')}</span></div>`).join('')}</div></section>`;
+      const baseline = g[0];
+      return `<section class="dup-group"><b>${esc(label)}</b><span class="muted sm"> · ${g.length} 张 · 勾选要删除的图片</span><div class="dup-row">${g.map(e => {
+        const params = DUP_PARAM_FIELDS.map(([name, field]) => {
+          const value = dupParamValue(e, field), baseValue = dupParamValue(baseline, field);
+          return `<span class="dup-param ${value !== baseValue ? 'hl' : ''}">${esc(name)}：${esc(value)}</span>`;
+        }).join('');
+        return `<div class="dup-item"><div class="dlabel">${fmtTime(e.createdAt)} · ${esc(SRC[e.source] || '')}</div>${e.thumbId ? `<img data-blob="${e.thumbId}" alt="">` : '<div class="dimg">无图</div>'}<label><input type="checkbox" data-dupg="${gi}" data-delid="${e.id}">删除这张</label><div class="dup-params">${params}</div></div>`;
+      }).join('')}</div></section>`;
     }).join('');
     const m = openModal(`<h3>批量检查相同画师串</h3><p class="muted">相同画师串已按组横向排列。勾选要删除的图片；删除前会把星标、备注、vibe 关联和文件夹合并到保留图片。每组至少保留一张。</p><div class="dup-groups">${groupHtml}</div><div class="m-actions"><button class="btn" data-act="close">取消</button><button class="btn pri" id="dupGroupApply">应用删除选择</button></div>`,{wide:true});
     observeThumbs(m);
@@ -2569,7 +2588,7 @@ const ACT = {
   vmodel: async el => { const v = S.vibes.find(x => x.id === el.dataset.vid); if (!v) return; const m = el.dataset.m; v.models = v.models?.includes(m) ? v.models.filter(x => x !== m) : [...(v.models || []), m]; await putVibe(v); el.classList.toggle('on'); },
   'vibe-del': async el => { const v = S.vibes.find(x => x.id === el.dataset.vid); if (!v) return; if (!await ask(`删除 vibe「${esc(v.name)}」？`, '用过它的图会变回空心方块。', [{ t: '取消', v: false }, { t: '删除', v: true, cls: 'danger' }])) return; await deleteVibe(v.id); markDirty(); render(); },
   'jump-entry': el => jumpToEntry(el.dataset.id),
-  'vibe-unlink-entry': async el => { const e=byId(el.dataset.id); if(!e) return; if(!await ask('解除这张图片的 Vibe 关联？','只会移除这张图片与当前 Vibe 的关联，不删除图片本身。',[{t:'取消',v:false},{t:'解除关联',v:true,cls:'danger'}])) return; e.vibes=(e.vibes||[]).filter(x=>x.vibeId!==el.dataset.vid); await putEntry(e); markDirty(); render(); toast('已解除关联'); },
+  'vibe-unlink-entry': async el => { const e=byId(el.dataset.id); if(!e) return; if(!await ask('解除这张图片的 Vibe 关联？','只会移除这张图片与当前 Vibe 的关联，不删除图片本身。',[{t:'取消',v:false},{t:'解除关联',v:true,cls:'danger'}])) return; for(const slot of (e.vibes||[])) if(slot.vibeId===el.dataset.vid) slot.vibeId=null; await putEntry(e); markDirty(); render(); toast('已解除关联'); },
   hsel: el => { const id = el.dataset.id; S.hsel.has(id) ? S.hsel.delete(id) : S.hsel.add(id); el.classList.toggle('on'); const b = $('[data-act="hlink"]'); if (b) b.textContent = `把选中的 ${S.hsel.size || ''} 张关联过去`; },
   hlink: async () => { const vid = $('#hvibe')?.value; if (!vid || !S.hsel.size) return toast('先勾选图'); let n = 0; for (const id of S.hsel) { const e = byId(id); const slot = e?.vibes?.findIndex(v => !v.vibeId); if (e && slot >= 0) { await linkSlot(e, slot, vid); n++; } } S.hsel.clear(); toast(`已关联 ${n} 张`); render(); },
 
