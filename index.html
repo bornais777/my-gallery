@@ -2162,7 +2162,7 @@ function entryEditor(e, { focusGen = false } = {}) {
       let blob, seed = null;
       if (st.eng === 'gpt') blob = await genGPT({ prompt, size: sizeSel.value });
       else {
-        const api = $('#edRunModel', m).value || SET.nai.model;
+        const api = $('#edRunModel', m).value || SET.nai.model; $('#edM',m).value = api;
         const vibes = [];
         for (const v of st.vibes) { const vb = S.vibes.find(x => x.id === v.vibeId); const enc = await getVibeEncoding(vb, api); if (enc) vibes.push({ enc, strength: v.strength, info: v.info }); else if (vb) toast(`vibe「${esc(vb.name)}」没有这个模型的编码，这次没带上`); }
         const charPrompts = $('#edCharPrompts',m).value.split(/\n+/).map(x=>x.trim()).filter(Boolean);
