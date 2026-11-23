@@ -2043,7 +2043,7 @@ function entryEditor(e, { focusGen = false } = {}) {
   const isNew = !e;
   const d = e || { prompt: isNew ? SET.nai.defaultPrompt : '', negative: '', params: isNew ? { steps: SET.nai.steps, scale: SET.nai.scale, sampler: SET.nai.sampler, cfgRescale: SET.nai.cfgRescale, ucPreset: SET.nai.ucPreset, noiseSchedule: SET.nai.noiseSchedule } : {}, vibes: [], folderId: S.filters.folder && S.filters.folder !== '__none' ? S.filters.folder : '', note: '' };
   const basePrompt = e?.basePrompt ?? d.prompt;
-  const st = { vibes: structuredClone(d.vibes || []), img: null, arts: e ? artistsOf(e).map(a => ({ ...a })) : null, artsDirty: false, artsReset: false, eng: 'nai', genSeed: null, testTheme: e ? (d.testTheme || '') : (SET.nai.testTheme || ''), testTags: e ? (d.testTags || '') : (SET.nai.testTags || ''), testOrder: e ? (d.testOrder || 'base-first') : (SET.nai.testOrder || 'base-first'), multiCharacter: d.multiCharacter === true, charPrompts: d.charPrompts || '' };
+  const st = { vibes: structuredClone(d.vibes || []), img: null, arts: e ? artistsOf(e).map(a => ({ ...a })) : null, artsDirty: false, artsReset: false, eng: 'nai', genSeed: null, genModel: null, testTheme: e ? (d.testTheme || '') : (SET.nai.testTheme || ''), testTags: e ? (d.testTags || '') : (SET.nai.testTags || ''), testOrder: e ? (d.testOrder || 'base-first') : (SET.nai.testOrder || 'base-first'), multiCharacter: d.multiCharacter === true, charPrompts: d.charPrompts || '' };
   const curLabel = modelLabel(d.params?.modelRaw);
   const m = openModal(`<div class="ed-head"><h3>${isNew ? '添加文字串' : '编辑'}</h3><button class="btn icon-btn ghost" data-act="close">${ic('x')}</button></div>
   <div class="ed-grid">
@@ -2171,7 +2171,7 @@ function entryEditor(e, { focusGen = false } = {}) {
       let blob, seed = null;
       if (st.eng === 'gpt') { const gp = [prompt, $('#edUseGptStyle',m).checked ? SET.gpt.stylePrompt : ''].filter(Boolean).join('\n\n'); blob = await genGPT({ prompt: gp, size: sizeSel.value }); }
       else {
-        const api = $('#edRunModel', m).value || SET.nai.model; $('#edM',m).value = api;
+        const api = $('#edRunModel', m).value || SET.nai.model; $('#edM',m).value = api; st.genModel = api;
         const vibes = [];
         for (const v of st.vibes) { const vb = S.vibes.find(x => x.id === v.vibeId); const enc = await getVibeEncoding(vb, api); if (enc) vibes.push({ enc, strength: v.strength, info: v.info }); else if (vb) toast(`vibe「${esc(vb.name)}」没有这个模型的编码，这次没带上`); }
         const charPrompts = $('#edCharPrompts',m).value.split(/\n+/).map(x=>x.trim()).filter(Boolean);
@@ -2196,7 +2196,8 @@ function entryEditor(e, { focusGen = false } = {}) {
     ent.prompt = prompt; ent.basePrompt = base; ent.testTheme = $('#edTestTheme',m).value.trim(); ent.testTags = $('#edTestTags',m).value.trim(); ent.testOrder = st.testOrder; if (isNew) { SET.nai.testTheme = ent.testTheme; SET.nai.testTags = ent.testTags; SET.nai.testOrder = st.testOrder; saveSettings(); } ent.multiCharacter = $('#edMulti',m).checked; ent.charPrompts = $('#edCharPrompts',m).value; ent.charPositions = $('#edCharPositions',m).value; ent.negative = $('#edN', m).value.trim();
     const mv = $('#edM', m).value;
     const keepRaw = ent.params?.modelRaw && !SET.models.some(x => x.label === modelLabel(ent.params.modelRaw));
-    ent.params = { ...ent.params, modelRaw: mv || (keepRaw ? ent.params.modelRaw : ''), seed: num('#edSeed'), steps: num('#edSteps'), scale: num('#edScale'), cfgRescale: num('#edCfgRescale'), sampler: $('#edSampler',m).value, noiseSchedule: $('#edNoise',m).value, ucPreset: num('#edUC'), qualityToggle: $('#edQuality',m).checked };
+    const savedModel = st.img?.source === 'gen' && st.genModel ? st.genModel : (mv || (keepRaw ? ent.params.modelRaw : ''));
+    ent.params = { ...ent.params, modelRaw: savedModel, seed: num('#edSeed'), steps: num('#edSteps'), scale: num('#edScale'), cfgRescale: num('#edCfgRescale'), sampler: $('#edSampler',m).value, noiseSchedule: $('#edNoise',m).value, ucPreset: num('#edUC'), qualityToggle: $('#edQuality',m).checked };
     ent.vibes = st.vibes.filter(v => v.vibeId || v.strength != null).map(v => ({ sig: v.sig || null, strength: v.strength, info: v.info, vibeId: v.vibeId || null }));
     for (const v of ent.vibes) if (v.vibeId && v.sig) { const vb = S.vibes.find(x => x.id === v.vibeId); if (vb && !vb.sigs?.includes(v.sig)) { (vb.sigs ||= []).push(v.sig); await putVibe(vb); } }
     if (promptChanged || !ent.tokens?.length) ent.tokens = tokenize(prompt);
@@ -3146,7 +3147,7 @@ function coverModal(c) {
       <label class="field"><span>画师 / 风格标签</span><input id="cvArt" placeholder="artist:xxx, 1.2::artist:yyy::"></label>
       <label class="field"><span>角色外观与构图 <button class="btn xs" id="cvAI">${ic('wand', 12)}AI 根据描述写</button></span><textarea id="cvP" rows="6" placeholder="1girl, silver hair, red eyes, …, upper body, looking at viewer"></textarea></label>
       <label class="field" id="cvNegWrap"><span>负面（NAI）</span><textarea id="cvN" rows="2">${esc(SET.nai.neg)}</textarea></label>
-      <div class="seg" id="cvEng"><button data-e="nai" class="on">NAI</button><button data-e="gpt">GPT</button></div>
+      <div class="seg" id="cvEng"><button type="button" data-e="nai" class="on">NAI</button><button type="button" data-e="gpt">GPT</button></div>
       <label class="check" id="cvStyleWrap" style="display:none"><input type="checkbox" id="cvUseStyle" checked> 使用设置里保存的 GPT 画风规范</label>
       <div class="f2" id="cvNaiOpts"><label class="field"><span>配图尺寸</span><input value="832×1216（固定竖版）" disabled></label>
       <label class="field"><span>模型</span><select id="cvM">${SET.models.filter(x => /^nai-/.test(x.api)).map(x => `<option value="${esc(x.api)}" ${x.api === SET.nai.model ? 'selected' : ''}>${esc(x.label)}</option>`).join('')}</select></label></div>
@@ -3158,7 +3159,17 @@ function coverModal(c) {
   <div class="m-actions"><button class="btn" data-act="close">关闭</button><button class="btn pri" id="cvSet" disabled>设为封面</button></div>`, { wide: true, cls: 'editor' });
   let coverEngine = 'nai';
   const P = () => [$('#cvArt', m).value.trim(), $('#cvP', m).value.trim(), coverEngine === 'nai' ? SET.nai.quality : ($('#cvUseStyle',m).checked ? SET.gpt.stylePrompt : '')].filter(Boolean).join(', ');
-  $('#cvEng',m).onclick = ev => { const b=ev.target.closest('[data-e]'); if(!b)return; coverEngine=b.dataset.e; $('#cvEng button',m).forEach(x=>x.classList.toggle('on',x===b)); $('#cvNaiOpts',m).style.display=coverEngine==='nai'?'':'none'; $('#cvNegWrap',m).style.display=coverEngine==='nai'?'':'none'; $('#cvStyleWrap',m).style.display=coverEngine==='gpt'?'':'none'; $('#cvMsg',m).textContent=coverEngine==='gpt'?'使用设置里的 GPT 生图接口':'使用设置里的 NAI 生图接口'; };
+  const setCoverEngine = engine => {
+    coverEngine = engine;
+    $('#cvEng button',m).forEach(x => x.classList.toggle('on', x.dataset.e === engine));
+    $('#cvNaiOpts',m).style.display = engine === 'nai' ? '' : 'none';
+    $('#cvNegWrap',m).style.display = engine === 'nai' ? '' : 'none';
+    $('#cvStyleWrap',m).style.display = engine === 'gpt' ? '' : 'none';
+    $('#cvMsg',m).textContent = engine === 'gpt' ? '使用设置里的 GPT 生图接口' : '使用设置里的 NAI 生图接口';
+  };
+  $('#cvEng button',m).forEach(btn => {
+    btn.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); setCoverEngine(btn.dataset.e); });
+  });
   $('#cvRow', m).onchange = ev => { const e = byId(ev.target.value); if (e) $('#cvArt', m).value = artistStringOf(e); };
   $('#cvAI', m).onclick = async ev => {
     const b = ev.currentTarget; b.disabled = true; b.classList.add('loading');
