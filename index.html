@@ -2363,7 +2363,7 @@ async function ocrEntry(e) {
   e.params = { seed: j.seed ?? null, steps: j.steps ?? null, scale: j.scale ?? null, sampler: j.sampler || '', width: j.width || null, height: j.height || null, modelRaw: j.model || '' };
   e.vibes = (j.vibe_strengths || []).filter(x => x != null).map(s => ({ strength: +s, info: null, sig: null, vibeId: null }));
   e.tokens = tokenize(e.prompt);
-  await putEntry(e);
+  if (e.prompt.trim()) await putEntry(e);
 }
 async function checkDups(list) {
   const ids = new Set(list.filter(e => S.entries.includes(e)).map(e => e.id));
