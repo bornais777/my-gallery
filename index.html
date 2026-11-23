@@ -862,7 +862,7 @@ function diffEntry(e, b) {
   return { marks, removed, seed: (e.params?.seed ?? null) !== (b.params?.seed ?? null), vibe: vibeKey(e) !== vibeKey(b) };
 }
 function artistSig(e) { const a = artistsOf(e); return a.length ? a.map(x => x.n + '@' + x.w).sort().join('|') : null; }
-function negativeSig(e) { return String(e.negative || '').replace(/\\s+/g, ' ').trim(); }
+function negativeSig(e) { return String(e.negative || '').replace(/\s+/g, ' ').trim(); }
 function duplicateSig(e) { const a = artistSig(e); return a ? a + '||NEG:' + negativeSig(e) : null; }
 const pairKey = (a, b) => [a.id, b.id].sort().join('|');
 function findDupFor(e) {
