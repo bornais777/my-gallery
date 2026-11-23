@@ -251,8 +251,7 @@ select:focus,.inp:focus,.field input:focus,.field textarea:focus{border-color:va
 .mchip{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--field)}
 .mchip.on{background:var(--accent);color:#fff;border-color:transparent}
 .vuse{font-size:12.5px;color:var(--ink2)} .vuse b{font-size:16px;color:var(--ink)}
-.vthumbs{display:flex;flex-wrap:wrap;gap:5px}
-.vthumbs button{width:42px;height:56px;border-radius:8px;overflow:hidden;background:var(--field);display:grid;place-items:center}
+.vthumbs{display:flex;flex-wrap:wrap;gap:7px}.vused-item{position:relative;width:48px;height:64px}.vthumbs button{width:42px;height:56px;border-radius:8px;overflow:hidden;background:var(--field);display:grid;place-items:center}.vused-item button[data-act="vibe-unlink-entry"]{position:absolute;right:-3px;top:-4px;width:19px;height:19px;min-height:19px;padding:0;border-radius:50%;font-size:13px;line-height:1}
 .vthumbs img{width:100%;height:100%;object-fit:cover}
 .vact{display:flex;justify-content:flex-end}
 .hollow{padding:14px;border-radius:var(--r)}
@@ -1948,7 +1947,7 @@ function vibeCard(v, used) {
       <textarea rows="2" placeholder="备注" data-vchg="note" data-vid="${v.id}">${esc(v.note || '')}</textarea>
       <div class="vmodels">${vibeModelOpts().map(m => `<button class="mchip ${v.models?.includes(m) ? 'on' : ''}" data-act="vmodel" data-vid="${v.id}" data-m="${esc(m)}">${esc(m)}</button>`).join('')}</div>
       <div class="vuse"><b>${used.length}</b> 次使用</div>
-      ${used.length ? `<div class="vthumbs">${used.slice(0, 30).map(e => `<div class="vused-item"><button data-act="jump-entry" data-id="${e.id}">${e.thumbId ? `<img data-blob="${e.thumbId}" alt="">` : ic('text')}</button><button class="btn xs danger" data-act="vibe-unlink-entry" data-vid="${v.id}" data-id="${e.id}" title="解除这张图与此 Vibe 的关联">×</button></div>`).join('')}</div>` : ''}
+      ${used.length ? `<div class="vthumbs">${used.map(e => `<div class="vused-item"><button data-act="jump-entry" data-id="${e.id}">${e.thumbId ? `<img data-blob="${e.thumbId}" alt="">` : ic('text')}</button><button class="btn xs danger" data-act="vibe-unlink-entry" data-vid="${v.id}" data-id="${e.id}" title="解除这张图与此 Vibe 的关联">×</button></div>`).join('')}</div>` : ''}
       <div class="vact"><button class="btn xs danger" data-act="vibe-del" data-vid="${v.id}">${ic('trash', 12)}删除</button></div>
     </div></div>`;
 }
@@ -2119,9 +2118,9 @@ function entryEditor(e, { focusGen = false } = {}) {
   drawVibes();
   const composePrompt = () => { const base = $('#edP', m).value.trim(), test = $('#edTestTags', m).value.trim(); return [st.testOrder === 'base-first' ? base : test, st.testOrder === 'base-first' ? test : base].filter(Boolean).join(', '); };
   const updateTestPreview = () => { $('#edTestPreview', m).textContent = composePrompt() || '（空）'; };
-  $('#edP',m).addEventListener('input', updateTestPreview); $('#edTestTags',m).addEventListener('input', ev => { SET.nai.testTags = ev.target.value; saveSettings(); updateTestPreview(); });
-  $('#edTestTheme',m).addEventListener('input', ev => { st.testTheme = ev.target.value; SET.nai.testTheme = st.testTheme; saveSettings(); });
-  $('#edTestOrder',m).onclick = () => { st.testOrder = st.testOrder === 'base-first' ? 'test-first' : 'base-first'; SET.nai.testOrder = st.testOrder; saveSettings(); $('#edTestOrder',m).textContent = (st.testOrder === 'base-first' ? '当前顺序：正面提示词在前' : '当前顺序：通用提示词在前') + ' · 切换顺序'; updateTestPreview(); };
+  $('#edP',m).addEventListener('input', updateTestPreview); $('#edTestTags',m).addEventListener('input', ev => { st.testTags = ev.target.value; updateTestPreview(); });
+  $('#edTestTheme',m).addEventListener('input', ev => { st.testTheme = ev.target.value; });
+  $('#edTestOrder',m).onclick = () => { st.testOrder = st.testOrder === 'base-first' ? 'test-first' : 'base-first'; if (isNew) { SET.nai.testOrder = st.testOrder; saveSettings(); } $('#edTestOrder',m).textContent = (st.testOrder === 'base-first' ? '当前顺序：正面提示词在前' : '当前顺序：通用提示词在前') + ' · 切换顺序'; updateTestPreview(); };
   $('#edRoll',m).onclick = async () => { const theme = $('#edTestTheme',m).value.trim(); if (!theme) return toast('先写一个测试方向'); if (!aiReady()) return toast('先在设置里配置文字 API'); const btn = $('#edRoll',m); btn.disabled = true; btn.classList.add('loading'); try { const out = await aiChat([{role:'system',content:'你是 NovelAI Danbooru 标签提示词生成器。把用户给出的创作方向转成可直接用于 NovelAI 的英文标签串。只输出逗号分隔的标签，不解释、不加代码块、不写画师名。内容聚焦一般人像、构图、光线、艺术风格和场景表达。'}, {role:'user',content:theme}],{json:false}); st.testTags = String(out).replace(/```[a-z]*|```/gi,'').trim().replace(/^提示词[:：]/,''); SET.nai.testTags = st.testTags; saveSettings(); $('#edTestTags',m).value = st.testTags; updateTestPreview(); } catch(err) { toast('Roll 失败：'+esc(err.message),5000); } finally { btn.disabled = false; btn.classList.remove('loading'); } };
   updateTestPreview();
 
@@ -2187,7 +2186,7 @@ function entryEditor(e, { focusGen = false } = {}) {
     const ent = e || { id: uid(), createdAt: now(), source: 'text', star: false, tokens: [], params: {}, vibes: [] };
     const beforeKey = e ? groupKey(e) : null;
     const promptChanged = ent.prompt !== prompt;
-    ent.prompt = prompt; ent.basePrompt = base; ent.testTheme = $('#edTestTheme',m).value.trim(); ent.testTags = $('#edTestTags',m).value.trim(); ent.testOrder = st.testOrder; SET.nai.testTheme = ent.testTheme; SET.nai.testTags = ent.testTags; SET.nai.testOrder = st.testOrder; saveSettings(); ent.multiCharacter = $('#edMulti',m).checked; ent.charPrompts = $('#edCharPrompts',m).value; ent.charPositions = $('#edCharPositions',m).value; ent.negative = $('#edN', m).value.trim();
+    ent.prompt = prompt; ent.basePrompt = base; ent.testTheme = $('#edTestTheme',m).value.trim(); ent.testTags = $('#edTestTags',m).value.trim(); ent.testOrder = st.testOrder; if (isNew) { SET.nai.testTheme = ent.testTheme; SET.nai.testTags = ent.testTags; SET.nai.testOrder = st.testOrder; saveSettings(); } ent.multiCharacter = $('#edMulti',m).checked; ent.charPrompts = $('#edCharPrompts',m).value; ent.charPositions = $('#edCharPositions',m).value; ent.negative = $('#edN', m).value.trim();
     const mv = $('#edM', m).value;
     const keepRaw = ent.params?.modelRaw && !SET.models.some(x => x.label === modelLabel(ent.params.modelRaw));
     ent.params = { ...ent.params, modelRaw: mv || (keepRaw ? ent.params.modelRaw : ''), seed: num('#edSeed'), steps: num('#edSteps'), scale: num('#edScale'), cfgRescale: num('#edCfgRescale'), sampler: $('#edSampler',m).value, noiseSchedule: $('#edNoise',m).value, ucPreset: num('#edUC'), qualityToggle: $('#edQuality',m).checked };
