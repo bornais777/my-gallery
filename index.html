@@ -1181,7 +1181,7 @@ async function parseImagesResponse(r) {
 async function genGPT({ prompt, size }) {
   const g = SET.gpt; if (!g.key) throw new Error('先在设置里填 GPT 生图 API');
   if (g.mode === 'chami') {
-    const base = (g.base || 'http://chami.yyqzx.com').trim().replace(/\/+$/, '');
+    const base = (g.base || 'https://chamigpt.bornais.workers.dev').trim().replace(/\/+$/, '');
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 300000);
     let r, raw;
@@ -2004,7 +2004,7 @@ function renderSettings(main) {
    </section>
    <section class="scard glass"><h3>${ic('image')}GPT 生图</h3>
      ${sel('gpt.mode', '接口格式', [['images', 'images/generations'], ['chat', 'chat/completions（回复里带图）'], ['chami', '茶蘼 GPT（SSE 流式）']])}
-     ${fld('gpt.base', '接口地址 / 域名', '茶蘼默认 http://chami.yyqzx.com；CF 后填你的 HTTPS 域名（只填域名）')}
+     ${fld('gpt.base', '接口地址 / 域名', '默认使用 https://chamigpt.bornais.workers.dev；接口路径自动拼接')}
      ${fld('gpt.key', 'GPT 线单个 API Key（不要用 NAI 组合 Key）', '', 'password')}
      ${fld('gpt.model', '通用 GPT 模型名', 'gpt-image-1')}
      <label class="field"><span>茶蘼 GPT 模型</span><select data-set="gpt.chamiModel"><option value="gpt-image-2" ${(SET.gpt.chamiModel || 'gpt-image-2') === 'gpt-image-2' ? 'selected' : ''}>gpt-image-2</option><option value="gpt-image-2.5" ${SET.gpt.chamiModel === 'gpt-image-2.5' ? 'selected' : ''}>gpt-image-2.5</option></select></label>
