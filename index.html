@@ -2343,7 +2343,7 @@ function dupGroupModal(groups) {
     observeThumbs(m);
     $('#dupGroupApply',m).onclick = async () => {
       for (let gi=0; gi<groups.length; gi++) {
-        const g=groups[gi], checked=$('[data-dupg="'+gi+'"]:checked',m).map(x=>x.dataset.delid);
+        const g=groups[gi], checked=$$('[data-dupg="'+gi+'"]:checked',m).map(x=>x.dataset.delid);
         const drops=g.filter(e=>checked.includes(e.id));
         if(drops.length>=g.length) drops.pop();
         const keeps=g.filter(e=>!drops.includes(e));
