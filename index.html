@@ -686,7 +686,7 @@ const S = {
   expanded: new Set(), openPrompts: new Set(), tagChipsOpen: new Set(), selected: new Set(), hsel: new Set(),
   selectMode: false, homeFocus: 0, homeRows: [], rowMap: {}, dupPairs: null,
   dirty: false, syncing: false, syncMsg: '', lastSync: +localStorage.getItem('huapu.lastSync') || 0,
-  animRow: null, pop: null, lb: null,
+  animRow: null, pop: null, lb: null, artistTab: 'artist', robustResults: [], wishResult: null,
 };
 
 /* ================= 存储层（可替换） ================= */
@@ -1582,7 +1582,7 @@ const IC = {
 };
 const ic = (n, s = 16) => `<svg class="ic" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${IC[n] || ''}</svg>`;
 const SRC = { png: '原图', screenshot: '截图', text: '文字串', gen: '生图' };
-const VIEWS = [['home', '首页', 'home'], ['library', '画师串', 'rows'], ['story', '分镜', 'film'], ['cards', '角色卡', 'card'], ['vibes', 'Vibe', 'vibe'], ['artists', '画师索引', 'artist'], ['dups', '查重', 'dup'], ['settings', '设置', 'gear']];
+const VIEWS = [['home', '首页', 'home'], ['library', '画师串', 'rows'], ['story', '分镜', 'film'], ['cards', '角色卡', 'card'], ['vibes', 'Vibe', 'vibe'], ['artists', '画师索引', 'artist'], ['dups', '查重', 'dup'], ['robust', '鲁棒测试', 'activity'], ['wish', '许愿台', 'sparkles'], ['settings', '设置', 'gear']];
 const BNAV = ['home', 'library', 'story', 'cards'];
 
 /* ================= 弹层 ================= */
@@ -1650,7 +1650,7 @@ function render() {
   renderNav();
   const main = $('#main');
   document.body.dataset.view = S.view;
-  ({ home: renderHome, library: renderLibrary, story: renderStory, cards: renderCards, vibes: renderVibes, artists: renderArtists, dups: renderDups, settings: renderSettings }[S.view] || renderHome)(main);
+  ({ home: renderHome, library: renderLibrary, story: renderStory, cards: renderCards, vibes: renderVibes, artists: renderArtists, dups: renderDups, robust: renderRobust, wish: renderWish, settings: renderSettings }[S.view] || renderHome)(main);
   renderQueuePill?.();
   renderBulk(); renderSyncBadge(); observeThumbs();
 }
@@ -1982,15 +1982,93 @@ function vibeCard(v, used) {
 
 /* ================= 画师索引 ================= */
 function renderArtists(main) {
-  const m = new Map();
-  for (const e of S.entries) for (const a of artistsOf(e)) m.set(a.n, (m.get(a.n) || 0) + 1);
+  const artists = new Map(), styles = new Map();
+  for (const e of S.entries) {
+    const seenA = new Set(), seenS = new Set();
+    for (const a of artistsOf(e)) { artists.set(a.n, (artists.get(a.n) || 0) + 1); seenA.add(a.n); }
+    for (const t of e.tokens || []) if (catOf(t) === 'style') { styles.set(t.n, (styles.get(t.n) || 0) + 1); seenS.add(t.n); }
+  }
+  const data = S.artistTab === 'style' ? styles : artists;
   const groups = new Map();
-  for (const [n, c] of [...m].sort((a, b) => a[0].localeCompare(b[0]))) { const L = /^[a-z]/i.test(n) ? n[0].toUpperCase() : '#'; if (!groups.has(L)) groups.set(L, []); groups.get(L).push([n, c]); }
-  main.innerHTML = `<div class="page-h"><div><h2>画师索引</h2><p class="muted">${m.size} 位画师 · 名字统一成小写，下划线换成空格。点名字只看这位画师的串。</p></div></div>
-  ${m.size ? [...groups].map(([L, arr]) => `<section class="aidx glass"><h3>${L}</h3><div class="chips">${arr.map(([n, c]) => `<button class="chip artist big" data-act="artist-filter" data-n="${esc(n)}">${esc(n)}<i>${c}</i></button>`).join('')}</div></section>`).join('') : emptyState('还没有认出的画师')}`;
+  for (const [n, c] of [...data].sort((a, b) => a[0].localeCompare(b[0]))) { const L = /^[a-z]/i.test(n) ? n[0].toUpperCase() : '#'; if (!groups.has(L)) groups.set(L, []); groups.get(L).push([n, c]); }
+  const isStyle = S.artistTab === 'style';
+  main.innerHTML = `<div class="page-h"><div><h2>${isStyle ? '风格词索引' : '画师索引'}</h2><p class="muted">${isStyle ? styles.size + ' 个风格词 · 按关联画师串数量统计，点击可查看包含该词的收藏' : artists.size + ' 位画师 · 名字统一成小写，下划线换成空格。点名字只看这位画师的串。'}</p></div>${isStyle ? '<button class="btn" data-act="style-index-add">＋添加风格词</button>' : ''}</div>
+  <div class="seg-tabs"><button class="btn ${!isStyle ? 'pri' : ''}" data-act="artist-index-tab" data-tab="artist">画师索引</button><button class="btn ${isStyle ? 'pri' : ''}" data-act="artist-index-tab" data-tab="style">风格词索引</button></div>
+  ${data.size ? [...groups].map(([L, arr]) => `<section class="aidx glass"><h3>${L}</h3><div class="chips">${arr.map(([n, c]) => `<button class="chip ${isStyle ? 'style' : 'artist'} big" data-act="${isStyle ? 'style-filter' : 'artist-filter'}" data-n="${esc(n)}">${esc(n)}<i>${c}</i></button>`).join('')}</div></section>`).join('') : emptyState(isStyle ? '还没有已分类的风格词' : '还没有认出的画师')}`;
 }
 
 /* ================= 查重 ================= */
+function renderRobust(main) {
+  const tests = SET.robust?.tests || [
+    { id:'gender', name:'不同性别', prompt:'1girl, female character' },
+    { id:'background', name:'带背景 / 环境', prompt:'detailed background, environmental storytelling' },
+    { id:'angle', name:'不同角度', prompt:'three-quarter view, from side' },
+    { id:'distance', name:'不同景别', prompt:'full body, wide shot' },
+    { id:'lighting', name:'不同光照', prompt:'dramatic backlighting, rim light' },
+    { id:'pose', name:'复杂姿势', prompt:'dynamic pose, foreshortening' },
+    { id:'expression', name:'不同表情', prompt:'expressive face, subtle emotion' },
+    { id:'crowd', name:'多人同框', prompt:'two characters, interaction' },
+    { id:'custom', name:'自定义', prompt:'' },
+  ];
+  SET.robust ||= {}; SET.robust.tests = tests;
+  main.innerHTML = `<div class="page-h"><div><h2>文生图鲁棒测试</h2><p class="muted">固定同一条基准画师串，改变画面需求，观察风格是否仍然稳定。测试项和提示词都可编辑。</p></div></div>
+  <section class="scard glass">
+    <label class="field"><span>基准画师串 / 风格串</span><textarea id="robustBase" rows="3" placeholder="artist:..., style tags...">${esc(SET.robust.base || '')}</textarea></label>
+    <label class="field"><span>统一负面提示词</span><textarea id="robustNeg" rows="2" placeholder="可留空">${esc(SET.robust.negative || '')}</textarea></label>
+    <div class="f3">${sel('nai.model','模型',SET.models.map(m=>[m.api,m.label]))}${sel('nai.size','尺寸',[['832x1216','832×1216 竖'],['1216x832','1216×832 横'],['1024x1024','1024×1024 方']])}${fld('nai.steps','Steps','28','number')}</div>
+    <p class="muted sm">默认沿用设置中的 Scale、Sampler、CFG Rescale 等参数；各项随机 Seed。此处模型和尺寸独立于默认设置。</p>
+    <div id="robustTests" class="robust-tests">${tests.map(t=>`<div class="robust-test"><input data-rname="${t.id}" value="${esc(t.name)}" placeholder="测试名称"><textarea data-rprompt="${t.id}" rows="2" placeholder="这项测试追加的提示词，可留空">${esc(t.prompt)}</textarea><button class="btn xs danger" data-act="robust-remove" data-id="${t.id}">删除</button></div>`).join('')}</div>
+    <div class="row-inline"><button class="btn" data-act="robust-add">＋添加测试项</button><button class="btn pri" data-act="robust-run">一次生成全部测试</button></div>
+  </section>
+  <div id="robustResults" class="robust-results">${S.robustResults.map((r,i)=>`<div class="robust-result glass"><b>${esc(r.name)}</b><img src="${r.url}" data-act="robust-preview" data-i="${i}" alt=""><p class="muted sm">${esc(r.prompt)}</p></div>`).join('')}</div>`;
+}
+function renderWish(main) {
+  const w = S.wishResult;
+  main.innerHTML = `<div class="page-h"><div><h2>许愿台</h2><p class="muted">画师只从你的收藏中选择；风格词以收藏为参考，允许 AI 根据本次意图创造新词。</p></div></div>
+  <section class="scard glass">
+    <label class="field"><span>描述你想要的整体风格</span><textarea id="wishIdea" rows="5" placeholder="例如：法吉特那种美型真人感，半写实、带一点厚涂，光影有层次但不要油腻……">${esc(S.wishIdea || '')}</textarea></label>
+    <p class="muted sm">不会修改已有画师串。AI 会检索画师索引和风格词索引，再从收藏画师中挑选，并生成新的风格词组合。</p>
+    <button class="btn pri" data-act="wish-generate">检索收藏并生成方案</button>
+  </section>
+  ${w ? `<section class="scard glass wish-result">
+    <h3>候选方案</h3><p class="muted sm">以下画师均限制在你的收藏库中；风格词允许新创作。保存前可以自行编辑。</p>
+    <label class="field"><span>画师串（仅库内画师）</span><textarea id="wishArtists" rows="3">${esc(w.artistString)}</textarea></label>
+    <label class="field"><span>风格词（库内参考 + AI 新词）</span><textarea id="wishStyles" rows="3">${esc(w.stylePrompt)}</textarea></label>
+    <label class="field"><span>组合后的完整提示词</span><textarea id="wishFull" rows="5">${esc(w.prompt)}</textarea></label>
+    <div class="row-inline"><button class="btn" data-act="wish-copy">复制完整串</button><button class="btn pri" data-act="wish-editor">打开文字串编辑器</button></div>
+    <details><summary>查看本次检索到的参考</summary><p class="muted sm">画师候选：${esc((w.sources?.artists || []).join('、'))}</p><p class="muted sm">风格词参考：${esc((w.sources?.styles || []).join('、'))}</p><p class="muted sm">AI 新生成词：${esc((w.newStyles || []).join('、'))}</p></details>
+  </section>` : ''}`;
+}
+async function generateWish() {
+  if (!aiReady()) return toast('先在设置里配置文字 API');
+  const idea = ($('#wishIdea')?.value || '').trim(); if (!idea) return toast('先描述想要的风格');
+  S.wishIdea = idea;
+  const artistCounts = new Map(), styleCounts = new Map(), styleRows = new Map(), artistRows = new Map();
+  for (const e of S.entries) {
+    for (const a of artistsOf(e)) { artistCounts.set(a.n,(artistCounts.get(a.n)||0)+1); if(!artistRows.has(a.n))artistRows.set(a.n,[]); artistRows.get(a.n).push(e); }
+    for (const t of e.tokens || []) if(catOf(t)==='style') { styleCounts.set(t.n,(styleCounts.get(t.n)||0)+1); if(!styleRows.has(t.n))styleRows.set(t.n,[]); styleRows.get(t.n).push(e); }
+  }
+  const words = normTag(idea).split(/\s+/).filter(x=>x.length>1);
+  const score = (n,c) => words.reduce((v,w)=>v+(n.includes(w)?2:0),0)+Math.min(1,c/10);
+  const artists = [...artistCounts].sort((a,b)=>score(b[0],b[1])-score(a[0],a[1])||b[1]-a[1]).slice(0,180).map(([name,count])=>({name,count}));
+  const styles = [...styleCounts].sort((a,b)=>score(b[0],b[1])-score(a[0],a[1])||b[1]-a[1]).slice(0,260).map(([name,count])=>({name,count}));
+  const wait=toast('正在检索你的画师与风格词收藏…',600000);
+  try {
+    const msgs=[
+      {role:'system',content:'你是画师串策划助手。用户的收藏库是偏好边界。画师必须严格从给定的库内画师名单中选择，绝对不能创造、猜测或改写画师名；可以选择多个画师并给权重。风格词则不同：给定风格词只是用户偏好的参考语料，不要求照抄；你可以根据用户意图组合已有词、改写或创造新的英文 Danbooru/NovelAI 风格标签。不要输出画面内容词、角色名、姿势等场景词。只返回 JSON：{"artists":[{"name":"库内原名","weight":1}],"style_tags":["tag"],"new_styles":["new tag"],"reason":"简短说明"}'},
+      {role:'user',content:'用户想要：'+idea+'\n\n库内画师名单（只能从这里选择）：'+JSON.stringify(artists)+'\n\n库内风格词及关联记录数（仅供参考，可不选、可组合、可创造新词）：'+JSON.stringify(styles)+'\n\n请形成整体方案。'}
+    ];
+    const raw=await aiChat(msgs); const j=parseJSONLoose(raw);
+    const allowed=new Map(artists.map(a=>[normTag(a.name),a.name]));
+    const chosen=(j.artists||[]).filter(a=>allowed.has(normTag(a.name))).map(a=>({name:allowed.get(normTag(a.name)),weight:Number.isFinite(+a.weight)?Math.max(0.1,Math.min(3,+a.weight)):1}));
+    const styleTags=[...new Set((j.style_tags||[]).map(x=>String(x).trim()).filter(Boolean))];
+    const artistString=chosen.map(a=>`artist:${a.name}${a.weight!==1?`::${a.weight}`:''}`).join(', ');
+    const stylePrompt=styleTags.join(', ');
+    const prompt=[artistString,stylePrompt].filter(Boolean).join(', ');
+    S.wishResult={artistString,stylePrompt,prompt,sources:{artists:chosen.map(a=>a.name),styles:styles.filter(x=>styleTags.some(t=>normTag(t)===normTag(x.name))).map(x=>x.name)},newStyles:(j.new_styles||[]).map(String),reason:j.reason||''};
+    wait.remove();render();
+  }catch(err){wait.remove();toast('许愿台生成失败：'+esc(err.message),6000);}
+}
 function renderDups(main) {
   const P = S.dupPairs;
   main.innerHTML = `<div class="page-h"><div><h2>查重</h2><p class="muted">正面画师和权重、负面提示词都相同才算重复；seed 不同会标黄，可以都留；文件完全相同的单独提示。</p></div><button class="btn pri" data-act="scan-dups">${ic('dup')}扫描整个库</button></div>
@@ -2060,9 +2138,9 @@ function renderSettings(main) {
 }
 
 /* ================= 编辑器（添加文字串 / 编辑 / 生图） ================= */
-function entryEditor(e, { focusGen = false } = {}) {
+function entryEditor(e, { focusGen = false, initialPrompt = '' } = {}) {
   const isNew = !e;
-  const d = e || { prompt: isNew ? SET.nai.defaultPrompt : '', negative: '', params: isNew ? { steps: SET.nai.steps, scale: SET.nai.scale, sampler: SET.nai.sampler, cfgRescale: SET.nai.cfgRescale, ucPreset: SET.nai.ucPreset, noiseSchedule: SET.nai.noiseSchedule } : {}, vibes: [], folderId: S.filters.folder && S.filters.folder !== '__none' ? S.filters.folder : '', note: '' };
+  const d = e || { prompt: isNew ? (initialPrompt || '') : '', negative: '', params: isNew ? { steps: SET.nai.steps, scale: SET.nai.scale, sampler: SET.nai.sampler, cfgRescale: SET.nai.cfgRescale, ucPreset: SET.nai.ucPreset, noiseSchedule: SET.nai.noiseSchedule } : {}, vibes: [], folderId: S.filters.folder && S.filters.folder !== '__none' ? S.filters.folder : '', note: '' };
   const basePrompt = e?.basePrompt ?? d.prompt;
   const st = { vibes: structuredClone(d.vibes || []), img: null, arts: e ? artistsOf(e).map(a => ({ ...a })) : null, artsDirty: false, artsReset: false, eng: 'nai', genSeed: null, genModel: null, testTheme: e ? (d.testTheme || '') : (SET.nai.testTheme || ''), testTags: e ? (d.testTags || '') : (SET.nai.testTags || ''), testOrder: e ? (d.testOrder || 'base-first') : (SET.nai.testOrder || 'base-first'), multiCharacter: d.multiCharacter === true, charPrompts: d.charPrompts || '' };
   const curLabel = modelLabel(d.params?.modelRaw);
@@ -2634,6 +2712,30 @@ const ACT = {
   hlink: async () => { const vid = $('#hvibe')?.value; if (!vid || !S.hsel.size) return toast('先勾选图'); let n = 0; for (const id of S.hsel) { const e = byId(id); const slot = e?.vibes?.findIndex(v => !v.vibeId); if (e && slot >= 0) { await linkSlot(e, slot, vid); n++; } } S.hsel.clear(); toast(`已关联 ${n} 张`); render(); },
 
   'artist-filter': el => { Object.assign(S.filters, { q: '', model: '', vibe: 'any', star: false, folder: '', recipe: false, artist: el.dataset.n }); S.view = 'library'; render(); window.scrollTo({ top: 0 }); },
+  'artist-index-tab': el => { S.artistTab = el.dataset.tab; render(); },
+  'style-filter': el => { Object.assign(S.filters,{q:el.dataset.n,model:'',vibe:'any',star:false,folder:'',recipe:false,artist:''}); S.view='library'; render(); window.scrollTo({top:0}); },
+  'style-index-add': async () => { const n=await promptText('添加常用风格词','','输入原始英文标签'); if(!n)return; const k=normTag(n); S.tags[k]={c:'style',m:1}; await saveTags(); render(); toast('已加入风格词索引'); },
+  'robust-add': () => { SET.robust ||= {}; SET.robust.tests ||= []; SET.robust.tests.push({id:uid(),name:'自定义测试',prompt:''}); saveSettings(); render(); },
+  'robust-remove': el => { SET.robust.tests=(SET.robust?.tests||[]).filter(x=>x.id!==el.dataset.id); saveSettings(); render(); },
+  'robust-run': async () => {
+    const base=$('#robustBase')?.value.trim(); if(!base)return toast('先填写基准画师串');
+    SET.robust ||= {}; SET.robust.base=base; SET.robust.negative=$('#robustNeg')?.value||'';
+    SET.robust.tests=[...$('[data-rname]')].map(x=>({id:x.dataset.rname,name:x.value,prompt:$('[data-rprompt="'+x.dataset.rname+'"]')?.value||''})); saveSettings();
+    if(!SET.nai.key)return toast('先在设置里填写 NAI 生图 Key');
+    const tests=SET.robust.tests.filter(x=>x.name.trim()); if(!tests.length)return toast('至少保留一个测试项');
+    S.robustResults=[]; render();
+    for(let i=0;i<tests.length;i++){
+      const t=tests[i]; const msg=toast('鲁棒测试生成中 '+(i+1)+' / '+tests.length+'：'+esc(t.name),600000);
+      try{const out=await genNAI({prompt:[base,t.prompt].filter(Boolean).join(', '),negative:SET.robust.negative||SET.nai.neg,model:SET.nai.model,size:SET.nai.size,steps:SET.nai.steps,scale:SET.nai.scale,sampler:SET.nai.sampler,cfgRescale:SET.nai.cfgRescale,ucPreset:SET.nai.ucPreset,noiseSchedule:SET.nai.noiseSchedule,qualityToggle:SET.nai.qualityToggle});S.robustResults.push({name:t.name,prompt:[base,t.prompt].filter(Boolean).join(', '),url:URL.createObjectURL(out.blob),seed:out.seed});}
+      catch(err){S.robustResults.push({name:t.name,prompt:'生成失败：'+err.message,url:''});}
+      msg.remove(); render();
+    }
+    toast('鲁棒测试完成');
+  },
+  'robust-preview': el => { const r=S.robustResults[+el.dataset.i]; if(!r?.url)return; const m=openModal('<img style="display:block;max-width:90vw;max-height:82vh;margin:auto;object-fit:contain" src="'+r.url+'"><div class="m-actions"><button class="btn" data-act="close">关闭</button></div>',{wide:true}); },
+  'wish-generate': () => generateWish(),
+  'wish-copy': async () => { const txt=$('#wishFull')?.value||''; try{await navigator.clipboard.writeText(txt);toast('已复制');}catch{toast('复制失败');} },
+  'wish-editor': () => { const p=$('#wishFull')?.value||S.wishResult?.prompt||''; entryEditor(null,{initialPrompt:p}); },
   'scan-dups': () => { S.dupPairs = scanDups(); render(); },
   'dup-open': el => { const p = S.dupPairs?.[+el.dataset.i]; if (p) dupModal(p[0], p[1]); },
 
@@ -2714,6 +2816,14 @@ document.addEventListener('input', ev => {
   const t = ev.target;
   if (t.dataset.filter === 'q') { S.filters.q = t.value; clearTimeout(S.qt); S.qt = setTimeout(refreshList, 180); }
   else if (t.dataset.actInput === 'thumb') { SET.thumb = +t.value; $('.rows')?.style.setProperty('--tw', t.value + 'px'); clearTimeout(S.tt); S.tt = setTimeout(saveSettings, 300); }
+  else if (t.id === 'wishIdea') S.wishIdea = t.value;
+  else if (t.id === 'robustBase') { SET.robust ||= {}; SET.robust.base=t.value; saveSettings(); }
+  else if (t.dataset.rname || t.dataset.rprompt) {
+    SET.robust ||= {}; SET.robust.tests ||= [];
+    const id=t.dataset.rname||t.dataset.rprompt; let x=SET.robust.tests.find(x=>x.id===id);
+    if(!x){x={id,name:'自定义测试',prompt:''};SET.robust.tests.push(x);}
+    if(t.dataset.rname)x.name=t.value;else x.prompt=t.value; saveSettings();
+  }
   else if (t.id === 'homeSearch') {
     const q = normTag(t.value); if (!q) return;
     let i = S.homeRows.findIndex(r => r.names.some(n => n.startsWith(q)));
