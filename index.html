@@ -686,7 +686,7 @@ const S = {
   expanded: new Set(), openPrompts: new Set(), tagChipsOpen: new Set(), selected: new Set(), hsel: new Set(),
   selectMode: false, homeFocus: 0, homeRows: [], rowMap: {}, dupPairs: null,
   dirty: false, syncing: false, syncMsg: '', lastSync: +localStorage.getItem('huapu.lastSync') || 0,
-  animRow: null, pop: null, lb: null, artistTab: 'artist', robustResults: [], wishResult: null,
+  animRow: null, pop: null, lb: null, artistTab: 'artist', robustResults: [], wishResult: null, wishAxes: { weight:50, saturation:50, realism:50, contrast:50, softness:50, detail:50, beauty:65 },
 };
 
 /* ================= 存储层（可替换） ================= */
@@ -2025,49 +2025,69 @@ function renderRobust(main) {
   <div id="robustResults" class="robust-results">${S.robustResults.map((r,i)=>`<div class="robust-result glass"><b>${esc(r.name)}</b><img src="${r.url}" data-act="robust-preview" data-i="${i}" alt=""><p class="muted sm">${esc(r.prompt)}</p></div>`).join('')}</div>`;
 }
 function renderWish(main) {
-  const w = S.wishResult;
-  main.innerHTML = `<div class="page-h"><div><h2>许愿台</h2><p class="muted">画师只从你的收藏中选择；风格词以收藏为参考，允许 AI 根据本次意图创造新词。</p></div></div>
-  <section class="scard glass">
-    <label class="field"><span>描述你想要的整体风格</span><textarea id="wishIdea" rows="5" placeholder="例如：法吉特那种美型真人感，半写实、带一点厚涂，光影有层次但不要油腻……">${esc(S.wishIdea || '')}</textarea></label>
-    <p class="muted sm">不会修改已有画师串。AI 会检索画师索引和风格词索引，再从收藏画师中挑选，并生成新的风格词组合。</p>
-    <button class="btn pri" data-act="wish-generate">检索收藏并生成方案</button>
-  </section>
-  ${w ? `<section class="scard glass wish-result">
-    <h3>候选方案</h3><p class="muted sm">以下画师均限制在你的收藏库中；风格词允许新创作。保存前可以自行编辑。</p>
-    <label class="field"><span>画师串（仅库内画师）</span><textarea id="wishArtists" rows="3">${esc(w.artistString)}</textarea></label>
-    <label class="field"><span>风格词（库内参考 + AI 新词）</span><textarea id="wishStyles" rows="3">${esc(w.stylePrompt)}</textarea></label>
-    <label class="field"><span>组合后的完整提示词</span><textarea id="wishFull" rows="5">${esc(w.prompt)}</textarea></label>
-    <div class="row-inline"><button class="btn" data-act="wish-copy">复制完整串</button><button class="btn pri" data-act="wish-editor">打开文字串编辑器</button></div>
-    <details><summary>查看本次检索到的参考</summary><p class="muted sm">画师候选：${esc((w.sources?.artists || []).join('、'))}</p><p class="muted sm">风格词参考：${esc((w.sources?.styles || []).join('、'))}</p><p class="muted sm">AI 新生成词：${esc((w.newStyles || []).join('、'))}</p></details>
-  </section>` : ''}`;
+  const w=S.wishResult,axes=S.wishAxes||(S.wishAxes={weight:50,saturation:50,realism:50,contrast:50,softness:50,detail:50,beauty:65});
+  const defs=[['weight','厚重程度','轻薄通透','厚重浓郁'],['saturation','色彩饱和度','低饱和灰调','鲜明浓郁'],['realism','写实程度','风格化插画','真人写实'],['contrast','明暗反差','柔和低反差','强烈反差'],['softness','边缘与过渡','清晰硬边','柔和融合'],['detail','细节密度','简洁概括','繁复细腻'],['beauty','人物美型倾向','自然不修饰','理想化美型']];
+  const selected=new Set(w?.negativePresets||[]);
+  main.innerHTML=`<div class="page-h"><div><h2>许愿台</h2><p class="muted">画师严格来自收藏；风格词参考收藏并允许 AI 创造。轴条决定视觉目标，AI 据此重新分配权重。</p></div></div>
+  <section class="scard glass"><label class="field"><span>描述你想要的整体风格</span><textarea id="wishIdea" rows="4" placeholder="例如：法吉特的风格，美型半写实半厚涂感，过渡柔和……">${esc(S.wishIdea||'')}</textarea></label>
+  <h3>视觉控制轴</h3><p class="muted sm">先写描述，再调整轴条。0 和 100 分别对应左右两端。</p>
+  <div class="wish-axes">${defs.map(([id,n,l,r])=>`<label class="field wish-axis"><span><b>${n}</b><i id="wishAxisVal-${id}">${axes[id]??50}</i></span><div class="wish-axis-ends"><small>${l}</small><small>${r}</small></div><input type="range" min="0" max="100" step="1" data-waxis="${id}" value="${axes[id]??50}"></label>`).join('')}</div>
+  <p class="muted sm">AI 会结合文字描述和数值，调整画师权重、风格词权重及负面约束。</p><button class="btn pri" data-act="wish-generate">检索收藏并生成方案</button></section>
+  ${w?`<section class="scard glass wish-result"><h3>候选方案</h3><p class="muted sm">画师名称只能来自收藏库，权重由 AI 按目标分配；风格词和负面词也有独立权重。</p>
+  <label class="field"><span>画师串（库内画师，权重可编辑）</span><textarea id="wishArtists" rows="3">${esc(w.artistString)}</textarea></label>
+  <label class="field"><span>风格词（收藏参考 + AI 新词，含权重）</span><textarea id="wishStyles" rows="4">${esc(w.stylePrompt)}</textarea></label>
+  <div class="field"><span>通用负面预设（按需选择，可手动勾选）</span><div class="wish-presets">${(SET.nai.negPresets||[]).map((p,i)=>`<label class="check"><input type="checkbox" data-wpreset="${i}" ${selected.has(p.name)?'checked':''}><span>${esc(p.name)}</span></label>`).join('')||'<p class="muted sm">尚无负面预设，可在文字串编辑器里保存。</p>'}</div></div>
+  <label class="field"><span>本次 AI 建议的针对性负面词（含权重，可编辑）</span><textarea id="wishNegTags" rows="3">${esc(w.negativeTags||'')}</textarea></label>
+  <label class="field"><span>最终负面提示词预览（可编辑）</span><textarea id="wishNegative" rows="4">${esc(w.negativePrompt||'')}</textarea></label>
+  <label class="field"><span>组合后的完整正面提示词</span><textarea id="wishFull" rows="5">${esc(w.prompt)}</textarea></label>
+  <div class="row-inline"><button class="btn" data-act="wish-compose">按当前选择重新组合</button><button class="btn" data-act="wish-copy">复制完整正负面</button><button class="btn pri" data-act="wish-editor">打开文字串编辑器</button></div>
+  <details><summary>查看本次检索参考</summary><p class="muted sm">画师候选：${esc((w.sources?.artists||[]).join('、'))}</p><p class="muted sm">风格词参考：${esc((w.sources?.styles||[]).join('、'))}</p><p class="muted sm">AI 新生成词：${esc((w.newStyles||[]).join('、'))}</p><p class="muted sm">采用负面预设：${esc((w.negativePresets||[]).join('、')||'无')}</p><p class="muted sm">AI 抑制词：${esc((w.negativeTagsRaw||[]).join('、')||'无')}</p><p class="muted sm">${esc(w.reason||'')}</p></details></section>`:''}`;
+}
+function wishWeightedTag(tag,weight) {
+  const n=Math.max(.1,Math.min(3,Number(weight)||1)),t=String(tag||'').trim();
+  return t?(Math.abs(n-1)<.005?t:`${n.toFixed(2).replace(/0+$/,'').replace(/\\.$/,'')}::${t}::`):'';
+}
+function composeWishPositive() {
+  const artistString=($('#wishArtists')?.value||'').trim(),stylePrompt=($('#wishStyles')?.value||'').trim(),prompt=[artistString,stylePrompt].filter(Boolean).join(', ');
+  if($('#wishFull'))$('#wishFull').value=prompt;
+  if(S.wishResult)Object.assign(S.wishResult,{artistString,stylePrompt,prompt});
+  return prompt;
+}
+function composeWishNegative() {
+  const selected=$$('[data-wpreset]:checked').map(x=>SET.nai.negPresets?.[+x.dataset.wpreset]).filter(Boolean);
+  const extra=($('#wishNegTags')?.value||'').trim(),neg=[...selected.map(x=>x.text.trim()),extra].filter(Boolean).join(', ');
+  if($('#wishNegative'))$('#wishNegative').value=neg;
+  if(S.wishResult)Object.assign(S.wishResult,{negativePresets:selected.map(x=>x.name),negativeTags:extra,negativePrompt:neg});
+  return neg;
 }
 async function generateWish() {
-  if (!aiReady()) return toast('先在设置里配置文字 API');
-  const idea = ($('#wishIdea')?.value || '').trim(); if (!idea) return toast('先描述想要的风格');
-  S.wishIdea = idea;
-  const artistCounts = new Map(), styleCounts = new Map(), styleRows = new Map(), artistRows = new Map();
-  for (const e of S.entries) {
-    for (const a of artistsOf(e)) { artistCounts.set(a.n,(artistCounts.get(a.n)||0)+1); if(!artistRows.has(a.n))artistRows.set(a.n,[]); artistRows.get(a.n).push(e); }
-    for (const t of e.tokens || []) if(catOf(t)==='style') { styleCounts.set(t.n,(styleCounts.get(t.n)||0)+1); if(!styleRows.has(t.n))styleRows.set(t.n,[]); styleRows.get(t.n).push(e); }
-  }
-  const words = normTag(idea).split(/\s+/).filter(x=>x.length>1);
-  const score = (n,c) => words.reduce((v,w)=>v+(n.includes(w)?2:0),0)+Math.min(1,c/10);
-  const artists = [...artistCounts].sort((a,b)=>score(b[0],b[1])-score(a[0],a[1])||b[1]-a[1]).slice(0,180).map(([name,count])=>({name,count}));
-  const styles = [...styleCounts].sort((a,b)=>score(b[0],b[1])-score(a[0],a[1])||b[1]-a[1]).slice(0,260).map(([name,count])=>({name,count}));
-  const wait=toast('正在检索你的画师与风格词收藏…',600000);
-  try {
+  if(!aiReady())return toast('先在设置里配置文字 API');
+  const idea=($('#wishIdea')?.value||'').trim();if(!idea)return toast('先描述想要的风格');
+  S.wishIdea=idea;
+  const axes={};$$('[data-waxis]').forEach(x=>axes[x.dataset.waxis]=+x.value);S.wishAxes={...S.wishAxes,...axes};
+  const artistCounts=new Map(),styleCounts=new Map();
+  for(const e of S.entries){for(const a of artistsOf(e))artistCounts.set(a.n,(artistCounts.get(a.n)||0)+1);const seen=new Set();for(const t of e.tokens||[])if(catOf(t)==='style')seen.add(t.n);for(const n of seen)styleCounts.set(n,(styleCounts.get(n)||0)+1);}
+  const words=normTag(idea).split(/\\s+/).filter(x=>x.length>1),score=(n,c)=>words.reduce((v,w)=>v+(n.includes(w)?2:0),0)+Math.min(1,c/10);
+  const artists=[...artistCounts].sort((a,b)=>score(b[0],b[1])-score(a[0],a[1])||b[1]-a[1]).slice(0,220).map(([name,count])=>({name,count}));
+  const styles=[...styleCounts].sort((a,b)=>score(b[0],b[1])-score(a[0],a[1])||b[1]-a[1]).slice(0,320).map(([name,count])=>({name,count}));
+  const presets=(SET.nai.negPresets||[]).map(p=>({name:p.name,text:p.text}));
+  const wait=toast('正在根据描述和视觉轴条分析收藏…',600000);
+  try{
     const msgs=[
-      {role:'system',content:'你是画师串策划助手。用户的收藏库是偏好边界。画师必须严格从给定的库内画师名单中选择，绝对不能创造、猜测或改写画师名；可以选择多个画师并给权重。风格词则不同：给定风格词只是用户偏好的参考语料，不要求照抄；你可以根据用户意图组合已有词、改写或创造新的英文 Danbooru/NovelAI 风格标签。不要输出画面内容词、角色名、姿势等场景词。只返回 JSON：{"artists":[{"name":"库内原名","weight":1}],"style_tags":["tag"],"new_styles":["new tag"],"reason":"简短说明"}'},
-      {role:'user',content:'用户想要：'+idea+'\n\n库内画师名单（只能从这里选择）：'+JSON.stringify(artists)+'\n\n库内风格词及关联记录数（仅供参考，可不选、可组合、可创造新词）：'+JSON.stringify(styles)+'\n\n请形成整体方案。'}
+      {role:'system',content:'你是画师串策划助手。画师名称必须严格从用户给定收藏名单选择，不能创造、猜测或改写；画师权重由你根据目标分配，范围0.1到3。风格词以库内词为参考，但可以组合、改写或创造新的英文风格标签，每个词给0.1到3权重。负面预设只能从给定预设中选择并返回原名；另可按本次风格提出少量针对性负面词并给权重，不要机械添加，不要重复通用质量词。厚重不等于高饱和，柔和过渡不等于低对比。不要把人物身份、动作、构图等场景词放入风格词。只返回JSON：{"artists":[{"name":"库内原名","weight":1.2}],"style_tags":[{"tag":"semi-realistic","weight":1.1}],"new_styles":[{"tag":"painterly rendering","weight":1.2}],"negative_presets":["预设原名"],"negative_tags":[{"tag":"rough texture","weight":0.8}],"reason":"简短说明"}'},
+      {role:'user',content:'风格描述：'+idea+'\\n视觉轴条（0=左，100=右）：'+JSON.stringify(axes)+'\\n轴条：厚重程度（轻薄→厚重）、色彩饱和度（低→高）、写实程度（风格化→真人写实）、明暗反差（柔和→强烈）、边缘过渡（硬边→柔和融合）、细节密度（简洁→繁复）、人物美型（自然→理想化）。\\n库内画师（只能从这里选择，权重可调）：'+JSON.stringify(artists)+'\\n库内风格词（参考，可创造新词）：'+JSON.stringify(styles)+'\\n已有负面预设（只能选，不可改名）：'+JSON.stringify(presets)+'\\n请结合描述与轴条形成方案。'}
     ];
-    const raw=await aiChat(msgs); const j=parseJSONLoose(raw);
-    const allowed=new Map(artists.map(a=>[normTag(a.name),a.name]));
-    const chosen=(j.artists||[]).filter(a=>allowed.has(normTag(a.name))).map(a=>({name:allowed.get(normTag(a.name)),weight:Number.isFinite(+a.weight)?Math.max(0.1,Math.min(3,+a.weight)):1}));
-    const styleTags=[...new Set([...(j.style_tags||[]),...(j.new_styles||[])].map(x=>String(x).trim()).filter(Boolean))];
-    const artistString=chosen.map(a=>`artist:${a.name}${a.weight!==1?`::${a.weight}`:''}`).join(', ');
-    const stylePrompt=styleTags.join(', ');
-    const prompt=[artistString,stylePrompt].filter(Boolean).join(', ');
-    S.wishResult={artistString,stylePrompt,prompt,sources:{artists:chosen.map(a=>a.name),styles:styles.filter(x=>styleTags.some(t=>normTag(t)===normTag(x.name))).map(x=>x.name)},newStyles:(j.new_styles||[]).map(String),reason:j.reason||''};
+    const j=parseJSONLoose(await aiChat(msgs)),allowed=new Map(artists.map(a=>[normTag(a.name),a.name]));
+    const chosen=(j.artists||[]).filter(a=>allowed.has(normTag(a.name))).map(a=>({name:allowed.get(normTag(a.name)),weight:Number.isFinite(+a.weight)?Math.max(.1,Math.min(3,+a.weight)):1}));
+    const artistString=chosen.map(a=>`artist:${a.name}${Math.abs(a.weight-1)>.005?`::${a.weight.toFixed(2).replace(/0+$/,'').replace(/\\.$/,'')}`:''}`).join(', ');
+    const weighted=arr=>(arr||[]).map(x=>typeof x==='string'?{tag:x,weight:1}:x).filter(x=>String(x.tag||'').trim()).map(x=>({tag:String(x.tag).trim(),weight:Number.isFinite(+x.weight)?Math.max(.1,Math.min(3,+x.weight)):1}));
+    const styleItems=weighted([...(j.style_tags||[]),...(j.new_styles||[])]),stylePrompt=styleItems.map(x=>wishWeightedTag(x.tag,x.weight)).join(', ');
+    const presetAllowed=new Set(presets.map(p=>p.name)),negativePresets=[...new Set((j.negative_presets||[]).filter(n=>presetAllowed.has(n)))];
+    const negItems=weighted(j.negative_tags),negativeTags=negItems.map(x=>wishWeightedTag(x.tag,x.weight)).join(', ');
+    const presetText=negativePresets.map(n=>presets.find(p=>p.name===n)?.text||'').filter(Boolean).join(', ');
+    const negativePrompt=[presetText,negativeTags].filter(Boolean).join(', '),prompt=[artistString,stylePrompt].filter(Boolean).join(', ');
+    const styleNames=styleItems.map(x=>x.tag);
+    S.wishResult={artistString,stylePrompt,prompt,negativePresets,negativeTags,negativeTagsRaw:negItems.map(x=>x.tag),negativePrompt,sources:{artists:chosen.map(a=>a.name),styles:styles.filter(x=>styleNames.some(t=>normTag(t)===normTag(x.name))).map(x=>x.name)},newStyles:(j.new_styles||[]).map(x=>typeof x==='string'?x:x.tag),reason:j.reason||''};
     wait.remove();render();
   }catch(err){wait.remove();toast('许愿台生成失败：'+esc(err.message),6000);}
 }
@@ -2140,9 +2160,9 @@ function renderSettings(main) {
 }
 
 /* ================= 编辑器（添加文字串 / 编辑 / 生图） ================= */
-function entryEditor(e, { focusGen = false, initialPrompt = '' } = {}) {
+function entryEditor(e, { focusGen = false, initialPrompt = '', initialNegative = '' } = {}) {
   const isNew = !e;
-  const d = e || { prompt: isNew ? (initialPrompt || '') : '', negative: '', params: isNew ? { steps: SET.nai.steps, scale: SET.nai.scale, sampler: SET.nai.sampler, cfgRescale: SET.nai.cfgRescale, ucPreset: SET.nai.ucPreset, noiseSchedule: SET.nai.noiseSchedule } : {}, vibes: [], folderId: S.filters.folder && S.filters.folder !== '__none' ? S.filters.folder : '', note: '' };
+  const d = e || { prompt: isNew ? (initialPrompt || '') : '', negative: initialNegative || '', params: isNew ? { steps: SET.nai.steps, scale: SET.nai.scale, sampler: SET.nai.sampler, cfgRescale: SET.nai.cfgRescale, ucPreset: SET.nai.ucPreset, noiseSchedule: SET.nai.noiseSchedule } : {}, vibes: [], folderId: S.filters.folder && S.filters.folder !== '__none' ? S.filters.folder : '', note: '' };
   const basePrompt = e?.basePrompt ?? d.prompt;
   const st = { vibes: structuredClone(d.vibes || []), img: null, arts: e ? artistsOf(e).map(a => ({ ...a })) : null, artsDirty: false, artsReset: false, eng: 'nai', genSeed: null, genModel: null, testTheme: e ? (d.testTheme || '') : (SET.nai.testTheme || ''), testTags: e ? (d.testTags || '') : (SET.nai.testTags || ''), testOrder: e ? (d.testOrder || 'base-first') : (SET.nai.testOrder || 'base-first'), multiCharacter: d.multiCharacter === true, charPrompts: d.charPrompts || '' };
   const curLabel = modelLabel(d.params?.modelRaw);
@@ -2736,8 +2756,9 @@ const ACT = {
   },
   'robust-preview': el => { const r=S.robustResults[+el.dataset.i]; if(!r?.url)return; const m=openModal('<img style="display:block;max-width:90vw;max-height:82vh;margin:auto;object-fit:contain" src="'+r.url+'"><div class="m-actions"><button class="btn" data-act="close">关闭</button></div>',{wide:true}); },
   'wish-generate': () => generateWish(),
-  'wish-copy': async () => { const txt=$('#wishFull')?.value||''; try{await navigator.clipboard.writeText(txt);toast('已复制');}catch{toast('复制失败');} },
-  'wish-editor': () => { const p=$('#wishFull')?.value||S.wishResult?.prompt||''; entryEditor(null,{initialPrompt:p}); },
+  'wish-copy': async () => { const p=composeWishPositive(),n=composeWishNegative(); try{await navigator.clipboard.writeText(p+'\\n\\nNegative prompt: '+n);toast('已复制正负面提示词');}catch{toast('复制失败');} },
+  'wish-compose': () => { composeWishPositive();composeWishNegative();toast('已按当前选择重新组合'); },
+  'wish-editor': () => { const p=composeWishPositive(),n=composeWishNegative();entryEditor(null,{initialPrompt:p,initialNegative:n}); },
   'scan-dups': () => { S.dupPairs = scanDups(); render(); },
   'dup-open': el => { const p = S.dupPairs?.[+el.dataset.i]; if (p) dupModal(p[0], p[1]); },
 
@@ -2821,6 +2842,7 @@ document.addEventListener('change', ev => {
 });
 document.addEventListener('input', ev => {
   const t = ev.target;
+  if (t.dataset.waxis) { S.wishAxes ||= {}; S.wishAxes[t.dataset.waxis]=+t.value; const out=$('#wishAxisVal-'+t.dataset.waxis); if(out)out.textContent=t.value; return; }
   if (t.dataset.filter === 'q') { S.filters.q = t.value; clearTimeout(S.qt); S.qt = setTimeout(refreshList, 180); }
   else if (t.dataset.actInput === 'thumb') { SET.thumb = +t.value; $('.rows')?.style.setProperty('--tw', t.value + 'px'); clearTimeout(S.tt); S.tt = setTimeout(saveSettings, 300); }
   else if (t.id === 'wishIdea') S.wishIdea = t.value;
