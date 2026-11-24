@@ -2063,7 +2063,7 @@ async function generateWish() {
     const raw=await aiChat(msgs); const j=parseJSONLoose(raw);
     const allowed=new Map(artists.map(a=>[normTag(a.name),a.name]));
     const chosen=(j.artists||[]).filter(a=>allowed.has(normTag(a.name))).map(a=>({name:allowed.get(normTag(a.name)),weight:Number.isFinite(+a.weight)?Math.max(0.1,Math.min(3,+a.weight)):1}));
-    const styleTags=[...new Set((j.style_tags||[]).map(x=>String(x).trim()).filter(Boolean))];
+    const styleTags=[...new Set([...(j.style_tags||[]),...(j.new_styles||[])].map(x=>String(x).trim()).filter(Boolean))];
     const artistString=chosen.map(a=>`artist:${a.name}${a.weight!==1?`::${a.weight}`:''}`).join(', ');
     const stylePrompt=styleTags.join(', ');
     const prompt=[artistString,stylePrompt].filter(Boolean).join(', ');
