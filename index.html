@@ -1986,8 +1986,10 @@ function renderArtists(main) {
   for (const e of S.entries) {
     const seenA = new Set(), seenS = new Set();
     for (const a of artistsOf(e)) { artists.set(a.n, (artists.get(a.n) || 0) + 1); seenA.add(a.n); }
-    for (const t of e.tokens || []) if (catOf(t) === 'style') { styles.set(t.n, (styles.get(t.n) || 0) + 1); seenS.add(t.n); }
+    for (const t of e.tokens || []) if (catOf(t) === 'style') seenS.add(t.n);
+    for (const n of seenS) styles.set(n, (styles.get(n) || 0) + 1);
   }
+  for (const [n, meta] of Object.entries(S.tags)) if (meta?.c === 'style' && !styles.has(n)) styles.set(n, 0);
   const data = S.artistTab === 'style' ? styles : artists;
   const groups = new Map();
   for (const [n, c] of [...data].sort((a, b) => a[0].localeCompare(b[0]))) { const L = /^[a-z]/i.test(n) ? n[0].toUpperCase() : '#'; if (!groups.has(L)) groups.set(L, []); groups.get(L).push([n, c]); }
@@ -2015,8 +2017,8 @@ function renderRobust(main) {
   <section class="scard glass">
     <label class="field"><span>基准画师串 / 风格串</span><textarea id="robustBase" rows="3" placeholder="artist:..., style tags...">${esc(SET.robust.base || '')}</textarea></label>
     <label class="field"><span>统一负面提示词</span><textarea id="robustNeg" rows="2" placeholder="可留空">${esc(SET.robust.negative || '')}</textarea></label>
-    <div class="f3">${sel('nai.model','模型',SET.models.map(m=>[m.api,m.label]))}${sel('nai.size','尺寸',[['832x1216','832×1216 竖'],['1216x832','1216×832 横'],['1024x1024','1024×1024 方']])}${fld('nai.steps','Steps','28','number')}</div>
-    <p class="muted sm">默认沿用设置中的 Scale、Sampler、CFG Rescale 等参数；各项随机 Seed。此处模型和尺寸独立于默认设置。</p>
+    <div class="f3"><label class="field"><span>测试模型</span><select data-rset="model">${SET.models.map(m=>`<option value="${esc(m.api)}" ${(SET.robust.model||SET.nai.model)===m.api?'selected':''}>${esc(m.label)}</option>`).join('')}</select></label><label class="field"><span>测试尺寸</span><select data-rset="size">${[['832x1216','832×1216 竖'],['1216x832','1216×832 横'],['1024x1024','1024×1024 方']].map(([v,l])=>`<option value="${v}" ${(SET.robust.size||SET.nai.size)===v?'selected':''}>${l}</option>`).join('')}</select></label><label class="field"><span>测试 Steps</span><input type="number" data-rset="steps" value="${SET.robust.steps??SET.nai.steps}"></label></div>
+    <p class="muted sm">测试参数独立保存，不会改动设置里的默认生图模型、尺寸或 Steps。Scale、Sampler、CFG Rescale 等沿用 NAI 设置；每项使用随机 Seed。</p>
     <div id="robustTests" class="robust-tests">${tests.map(t=>`<div class="robust-test"><input data-rname="${t.id}" value="${esc(t.name)}" placeholder="测试名称"><textarea data-rprompt="${t.id}" rows="2" placeholder="这项测试追加的提示词，可留空">${esc(t.prompt)}</textarea><button class="btn xs danger" data-act="robust-remove" data-id="${t.id}">删除</button></div>`).join('')}</div>
     <div class="row-inline"><button class="btn" data-act="robust-add">＋添加测试项</button><button class="btn pri" data-act="robust-run">一次生成全部测试</button></div>
   </section>
@@ -2726,7 +2728,7 @@ const ACT = {
     S.robustResults=[]; render();
     for(let i=0;i<tests.length;i++){
       const t=tests[i]; const msg=toast('鲁棒测试生成中 '+(i+1)+' / '+tests.length+'：'+esc(t.name),600000);
-      try{const out=await genNAI({prompt:[base,t.prompt].filter(Boolean).join(', '),negative:SET.robust.negative||SET.nai.neg,model:SET.nai.model,size:SET.nai.size,steps:SET.nai.steps,scale:SET.nai.scale,sampler:SET.nai.sampler,cfgRescale:SET.nai.cfgRescale,ucPreset:SET.nai.ucPreset,noiseSchedule:SET.nai.noiseSchedule,qualityToggle:SET.nai.qualityToggle});S.robustResults.push({name:t.name,prompt:[base,t.prompt].filter(Boolean).join(', '),url:URL.createObjectURL(out.blob),seed:out.seed});}
+      try{const out=await genNAI({prompt:[base,t.prompt].filter(Boolean).join(', '),negative:SET.robust.negative||SET.nai.neg,model:SET.robust.model||SET.nai.model,size:SET.robust.size||SET.nai.size,steps:SET.robust.steps??SET.nai.steps,scale:SET.nai.scale,sampler:SET.nai.sampler,cfgRescale:SET.nai.cfgRescale,ucPreset:SET.nai.ucPreset,noiseSchedule:SET.nai.noiseSchedule,qualityToggle:SET.nai.qualityToggle});S.robustResults.push({name:t.name,prompt:[base,t.prompt].filter(Boolean).join(', '),url:URL.createObjectURL(out.blob),seed:out.seed});}
       catch(err){S.robustResults.push({name:t.name,prompt:'生成失败：'+err.message,url:''});}
       msg.remove(); render();
     }
@@ -2795,6 +2797,11 @@ document.addEventListener('pointerdown', ev => {
 });
 document.addEventListener('change', ev => {
   const t = ev.target;
+  if (t.dataset.rset) {
+    SET.robust ||= {};
+    SET.robust[t.dataset.rset] = t.type === 'number' ? (t.value === '' ? null : +t.value) : t.value;
+    saveSettings(); return;
+  }
   if (t.dataset.set) {
     const v = t.type === 'checkbox' ? t.checked : t.type === 'number' ? (t.value === '' ? null : +t.value) : t.value;
     setPath(SET, t.dataset.set, v); saveSettings();
