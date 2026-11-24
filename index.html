@@ -2764,9 +2764,9 @@ const ACT = {
   },
   'robust-preview': el => { const r=S.robustResults[+el.dataset.i]; if(!r?.url)return; const m=openModal('<img style="display:block;max-width:90vw;max-height:82vh;margin:auto;object-fit:contain" src="'+r.url+'"><div class="m-actions"><button class="btn" data-act="close">关闭</button></div>',{wide:true}); },
   'wish-generate': () => generateWish(),
-  'wish-copy': async () => { const p=composeWishPositive(),n=$('#wishNegative')?.value||''; if(S.wishResult)S.wishResult.negativePrompt=n; try{await navigator.clipboard.writeText(p+'\n\nNegative prompt: '+n);toast('已复制正负面提示词');}catch{toast('复制失败');} },
+  'wish-copy': async () => { const p=$('#wishFull')?.value||'',n=$('#wishNegative')?.value||''; if(S.wishResult)Object.assign(S.wishResult,{prompt:p,negativePrompt:n}); try{await navigator.clipboard.writeText(p+'\n\nNegative prompt: '+n);toast('已复制正负面提示词');}catch{toast('复制失败');} },
   'wish-compose': () => { composeWishPositive();composeWishNegative();toast('已按当前选择重新组合'); },
-  'wish-editor': () => { const p=composeWishPositive(),n=$('#wishNegative')?.value||'';entryEditor(null,{initialPrompt:p,initialNegative:n}); },
+  'wish-editor': () => { const p=$('#wishFull')?.value||'',n=$('#wishNegative')?.value||'';entryEditor(null,{initialPrompt:p,initialNegative:n}); },
   'scan-dups': () => { S.dupPairs = scanDups(); render(); },
   'dup-open': el => { const p = S.dupPairs?.[+el.dataset.i]; if (p) dupModal(p[0], p[1]); },
 
@@ -2826,6 +2826,7 @@ document.addEventListener('pointerdown', ev => {
 });
 document.addEventListener('change', ev => {
   const t = ev.target;
+  if (t.dataset.wpreset !== undefined) { composeWishNegative(); return; }
   if (t.dataset.rset) {
     SET.robust ||= {};
     SET.robust[t.dataset.rset] = t.type === 'number' ? (t.value === '' ? null : +t.value) : t.value;
