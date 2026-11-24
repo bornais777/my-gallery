@@ -592,6 +592,14 @@ body[data-view=cards] .fab,body[data-view=story] .fab,body[data-view=settings] .
 .tag-classify-list{max-height:62vh;overflow:auto;display:flex;flex-direction:column;gap:7px;padding:8px 2px}.tag-classify-list .row-inline{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 8px;border-bottom:1px solid var(--line)}.tag-classify-list .row-inline span{min-width:0;overflow-wrap:anywhere}.tag-classify-list select{min-width:112px}
 .style-name-list{max-height:60vh;overflow:auto;display:flex;flex-direction:column;gap:7px}.style-name-row{display:flex;align-items:center;gap:8px;padding:9px 4px;border-bottom:1px solid var(--line)}.style-name-row>div{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}.style-name-row small{color:var(--muted);overflow-wrap:anywhere}
 .hero-actions{display:flex;justify-content:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+
+.wish-axes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:10px 18px;margin:12px 0 18px}
+.wish-axis{display:block!important;padding:10px 12px;border:1px solid var(--line);border-radius:var(--r2);background:var(--glass)}
+.wish-axis>span{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.wish-axis>span i{font-style:normal;font-variant-numeric:tabular-nums;color:var(--muted)}
+.wish-axis-ends{display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:12px;margin:5px 0}
+.wish-axis input[type=range]{width:100%;accent-color:var(--pri)}
+.wish-presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:6px 12px}
 </style>
 </head>
 <body>
@@ -2045,7 +2053,7 @@ function renderWish(main) {
 }
 function wishWeightedTag(tag,weight) {
   const n=Math.max(.1,Math.min(3,Number(weight)||1)),t=String(tag||'').trim();
-  return t?(Math.abs(n-1)<.005?t:`${n.toFixed(2).replace(/0+$/,'').replace(/\\.$/,'')}::${t}::`):'';
+  return t?(Math.abs(n-1)<.005?t:`${n.toFixed(2).replace(/0+$/,'').replace(/\.$/,'')}::${t}::`):'';
 }
 function composeWishPositive() {
   const artistString=($('#wishArtists')?.value||'').trim(),stylePrompt=($('#wishStyles')?.value||'').trim(),prompt=[artistString,stylePrompt].filter(Boolean).join(', ');
@@ -2079,7 +2087,7 @@ async function generateWish() {
     ];
     const j=parseJSONLoose(await aiChat(msgs)),allowed=new Map(artists.map(a=>[normTag(a.name),a.name]));
     const chosen=(j.artists||[]).filter(a=>allowed.has(normTag(a.name))).map(a=>({name:allowed.get(normTag(a.name)),weight:Number.isFinite(+a.weight)?Math.max(.1,Math.min(3,+a.weight)):1}));
-    const artistString=chosen.map(a=>`artist:${a.name}${Math.abs(a.weight-1)>.005?`::${a.weight.toFixed(2).replace(/0+$/,'').replace(/\\.$/,'')}`:''}`).join(', ');
+    const artistString=chosen.map(a=>`artist:${a.name}${Math.abs(a.weight-1)>.005?`::${a.weight.toFixed(2).replace(/0+$/,'').replace(/\.$/,'')}`:''}`).join(', ');
     const weighted=arr=>(arr||[]).map(x=>typeof x==='string'?{tag:x,weight:1}:x).filter(x=>String(x.tag||'').trim()).map(x=>({tag:String(x.tag).trim(),weight:Number.isFinite(+x.weight)?Math.max(.1,Math.min(3,+x.weight)):1}));
     const styleItems=weighted([...(j.style_tags||[]),...(j.new_styles||[])]),stylePrompt=styleItems.map(x=>wishWeightedTag(x.tag,x.weight)).join(', ');
     const presetAllowed=new Set(presets.map(p=>p.name)),negativePresets=[...new Set((j.negative_presets||[]).filter(n=>presetAllowed.has(n)))];
@@ -2756,9 +2764,9 @@ const ACT = {
   },
   'robust-preview': el => { const r=S.robustResults[+el.dataset.i]; if(!r?.url)return; const m=openModal('<img style="display:block;max-width:90vw;max-height:82vh;margin:auto;object-fit:contain" src="'+r.url+'"><div class="m-actions"><button class="btn" data-act="close">关闭</button></div>',{wide:true}); },
   'wish-generate': () => generateWish(),
-  'wish-copy': async () => { const p=composeWishPositive(),n=composeWishNegative(); try{await navigator.clipboard.writeText(p+'\\n\\nNegative prompt: '+n);toast('已复制正负面提示词');}catch{toast('复制失败');} },
+  'wish-copy': async () => { const p=composeWishPositive(),n=$('#wishNegative')?.value||''; if(S.wishResult)S.wishResult.negativePrompt=n; try{await navigator.clipboard.writeText(p+'\n\nNegative prompt: '+n);toast('已复制正负面提示词');}catch{toast('复制失败');} },
   'wish-compose': () => { composeWishPositive();composeWishNegative();toast('已按当前选择重新组合'); },
-  'wish-editor': () => { const p=composeWishPositive(),n=composeWishNegative();entryEditor(null,{initialPrompt:p,initialNegative:n}); },
+  'wish-editor': () => { const p=composeWishPositive(),n=$('#wishNegative')?.value||'';entryEditor(null,{initialPrompt:p,initialNegative:n}); },
   'scan-dups': () => { S.dupPairs = scanDups(); render(); },
   'dup-open': el => { const p = S.dupPairs?.[+el.dataset.i]; if (p) dupModal(p[0], p[1]); },
 
