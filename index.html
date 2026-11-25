@@ -1219,7 +1219,7 @@ async function genGPT({ prompt, size }) {
       r = await fetch(base + '/GPTimage/chami/v1/chat/completions', {
         method: 'POST',
         headers: hdr(g.key),
-        body: JSON.stringify({ model: g.chamiModel || 'gpt-image-2', messages: [{ role: 'user', content: prompt }], size: size || g.size || '1024x1024', stream: true }),
+        body: JSON.stringify({ model: g.model || g.chamiModel || 'gpt-image-2', messages: [{ role: 'user', content: prompt }], size: size || g.size || '1024x1024', stream: true }),
         signal: ctrl.signal,
       });
       raw = await r.text();
@@ -1520,7 +1520,11 @@ async function exportAll(withBlobs) {
     download(`huapu-${withBlobs ? 'full' : 'data'}-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}.json`, new Blob([JSON.stringify(data)], { type: 'application/json' }));
   } finally { t.remove(); }
 }
-async function importLib(file) {
+async 
+async function importTavernFiles(files){let added=0,images=0,failed=0;for(const file of files){try{const data=JSON.parse(await file.text()),items=Array.isArray(data)?data:(Array.isArray(data.presets)?data.presets:null);if(!items)throw new Error('不是酒馆画师串 JSON 数组');for(const item of items){const prompt=String(item.positivePrompt??item.prompt??'').trim(),negative=String(item.negativePrompt??item.negative??'');if(!prompt)continue;const e={id:uid(),createdAt:now()+added,source:'text',star:false,prompt,negative,chars:[],params:{},vibes:[],tokens:tokenize(prompt),folderId:S.filters.folder&&S.filters.folder!=='__none'?S.filters.folder:'',note:String(item.name||'酒馆导入')};const ref=typeof item.referenceImage==='string'?item.referenceImage:'';if(ref.startsWith('data:image/')){const blob=await(await fetch(ref)).blob();await attachImage(e,blob);images++;}await putEntry(e);added++;}}catch(err){failed++;toast(file.name+'：'+err.message,6000);}}render();toast(`酒馆导入完成：${added} 条，恢复图片 ${images} 张，失败文件 ${failed} 个`);}
+async function exportTavernSelected(){const selected=S.entries.filter(e=>S.selected.has(e.id));if(!selected.length)return toast('请先到画师串页开启多选并选中要导出的串');const out=[];for(let i=0;i<selected.length;i++){const e=selected[i];let referenceImage=null;if(e.origId){const b=await getBlob(e.origId);if(b){referenceImage=`data:${b.type||'image/png'};base64,${await blobToB64(b)}`;}}out.push({name:e.note||artistsOf(e).map(a=>a.n).join('、')||'画师串 '+(i+1),positivePrompt:e.prompt||'',negativePrompt:e.negative||'',sequence:i,referenceImage,thumbnail:null});}const d=new Date(),stamp=d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');download('huapu-tavern-presets-'+stamp+'.json',new Blob([JSON.stringify(out,null,2)],{type:'application/json'}));toast(`已导出 ${out.length} 条酒馆格式画师串`);}
+
+function importLib(file) {
   const t = toast('正在导入备份…', 600000);
   try {
     const data = JSON.parse(await file.text());
@@ -1613,6 +1617,7 @@ function openModal(html, { wide = false, cls = '' } = {}) {
   m.addEventListener('mousedown', ev => { if (ev.target === m) closeModal(m); });
   observeThumbs(m); return m;
 }
+function openImagePreview(src,title='图片预览'){if(!src)return;openModal(`<div class="image-preview-head"><b>${esc(title)}</b></div><div class="image-preview-stage"><img src="${src}" alt="${esc(title)}"></div><div class="m-actions"><button class="btn" data-act="close">关闭</button></div>`,{wide:true,cls:'image-preview-modal'});}
 function closeModal(m) {
   m = m || $('#modals .mask:last-child'); if (!m || m._closing) return;
   m._closing = true; m.classList.add('out'); setTimeout(() => m.remove(), 180); m._resolve?.(m._value ?? null);
@@ -1658,6 +1663,7 @@ const io = new IntersectionObserver(ents => {
 }, { rootMargin: '500px' });
 function observeThumbs(root = document) { $$('img[data-blob]:not([src])', root).forEach(i => io.observe(i)); }
 
+ .image-preview-modal .modal{width:min(96vw,1200px)}.image-preview-stage{display:grid;place-items:center;max-height:82vh;min-height:200px;overflow:auto;background:rgba(0,0,0,.08);border-radius:14px;padding:10px}.image-preview-stage img{max-width:100%;max-height:78vh;object-fit:contain;border-radius:10px}.image-preview-head{padding:4px 2px 12px}.robust-panel{display:flex;flex-direction:column;gap:14px}.robust-source select,.robust-panel select[multiple]{min-height:120px}.robust-base-preview{padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--field)}.robust-test-head{display:flex;align-items:center;gap:12px;margin-top:8px}.robust-test{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--field);margin:8px 0}.robust-enable{display:flex;justify-content:center;padding-top:8px}.robust-test-fields{display:grid;gap:8px;min-width:0}.robust-test-fields input,.robust-test-fields textarea{width:100%;min-width:0}.robust-results{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:16px}.robust-result img{cursor:zoom-in}.ed-img,#cvImg{cursor:zoom-in}
 /* ================= 主渲染 ================= */
 function applyTheme() { const t = SET.theme; if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t; }
 function render() {
@@ -1958,6 +1964,7 @@ function renderBulk() {
    <button class="btn sm" data-act="sel-all">全选当前</button>
    <button class="btn sm pri" data-act="reclassify-selected">${ic('wand', 13)}去污染</button>
    <button class="btn sm" data-act="bulk-move">${ic('folder', 13)}移动</button>
+   <button class="btn sm" data-act="export-tavern-selected">导出酒馆画师串</button>
    <button class="btn sm" data-act="bulk-star">${ic('star', 13)}星标</button>
    <button class="btn sm" data-act="bulk-unstar">取消星标</button>
    <button class="btn sm danger" data-act="bulk-del">${ic('trash', 13)}删除</button>
@@ -2028,15 +2035,18 @@ function renderRobust(main) {
     { id:'crowd', name:'多人同框', prompt:'two characters, interaction' },
     { id:'custom', name:'自定义', prompt:'' },
   ];
-  SET.robust ||= {}; SET.robust.tests = tests;
-  main.innerHTML = `<div class="page-h"><div><h2>文生图鲁棒测试</h2><p class="muted">固定同一条基准画师串，改变画面需求，观察风格是否仍然稳定。测试项和提示词都可编辑。</p></div></div>
-  <section class="scard glass">
-    <label class="field"><span>基准画师串 / 风格串</span><textarea id="robustBase" rows="3" placeholder="artist:..., style tags...">${esc(SET.robust.base || '')}</textarea></label>
+  SET.robust ||= {}; SET.robust.tests = tests; SET.robust.libraryEntryIds ||= [];
+  const libSelected=S.entries.filter(e=>SET.robust.libraryEntryIds.includes(e.id));const basePreview=[...libSelected.map(e=>e.prompt||''),SET.robust.base||''].filter(Boolean).join(', ');
+  main.innerHTML = `<div class="page-h"><div><h2>文生图鲁棒测试</h2><p class="muted">从画谱选择已有画师串，并可叠加手动输入；每项测试独立勾选，只生成选中的项目。</p></div></div>
+  <section class="scard glass robust-panel">
+    <label class="field"><span>从画谱选择画师串（可多选）</span><select id="robustLibrary" multiple size="5">${S.entries.filter(e=>String(e.prompt||'').trim()).map(e=>`<option value="${e.id}" ${SET.robust.libraryEntryIds.includes(e.id)?'selected':''}>${esc((artistsOf(e).map(a=>a.n).join('、')||'无画师')+' · '+(e.note||e.prompt.slice(0,55)).slice(0,64))}</option>`).join('')}</select><small class="muted">按住 Ctrl（Mac 为 Command）可多选；库内提示词会完整带入。</small></label>
+    <label class="field"><span>手动追加的基准画师串 / 风格串（可与库内选择并存）</span><textarea id="robustBase" rows="3" placeholder="artist:..., style tags...">${esc(SET.robust.base || '')}</textarea></label>
+    <div class="robust-base-preview"><b>当前基准预览</b><div id="robustBasePreview" class="ptxt mono">${esc(basePreview||'（尚未选择或输入）')}</div></div>
     <label class="field"><span>统一负面提示词</span><textarea id="robustNeg" rows="2" placeholder="可留空">${esc(SET.robust.negative || '')}</textarea></label>
     <div class="f3"><label class="field"><span>测试模型</span><select data-rset="model">${SET.models.map(m=>`<option value="${esc(m.api)}" ${(SET.robust.model||SET.nai.model)===m.api?'selected':''}>${esc(m.label)}</option>`).join('')}</select></label><label class="field"><span>测试尺寸</span><select data-rset="size">${[['832x1216','832×1216 竖'],['1216x832','1216×832 横'],['1024x1024','1024×1024 方']].map(([v,l])=>`<option value="${v}" ${(SET.robust.size||SET.nai.size)===v?'selected':''}>${l}</option>`).join('')}</select></label><label class="field"><span>测试 Steps</span><input type="number" data-rset="steps" value="${SET.robust.steps??SET.nai.steps}"></label></div>
     <p class="muted sm">测试参数独立保存，不会改动设置里的默认生图模型、尺寸或 Steps。Scale、Sampler、CFG Rescale 等沿用 NAI 设置；每项使用随机 Seed。</p>
-    <div id="robustTests" class="robust-tests">${tests.map(t=>`<div class="robust-test"><input data-rname="${t.id}" value="${esc(t.name)}" placeholder="测试名称"><textarea data-rprompt="${t.id}" rows="2" placeholder="这项测试追加的提示词，可留空">${esc(t.prompt)}</textarea><button class="btn xs danger" data-act="robust-remove" data-id="${t.id}">删除</button></div>`).join('')}</div>
-    <div class="row-inline"><button class="btn" data-act="robust-add">＋添加测试项</button><button class="btn pri" data-act="robust-run">一次生成全部测试</button></div>
+    <div class="robust-test-head"><b>测试项目</b><span class="muted sm">勾选需要运行的项目</span></div><div id="robustTests" class="robust-tests">${tests.map(t=>`<div class="robust-test"><label class="robust-enable"><input type="checkbox" data-renabled="${t.id}" ${t.enabled===true?'checked':''}></label><div class="robust-test-fields"><input data-rname="${t.id}" value="${esc(t.name)}" placeholder="测试名称"><textarea data-rprompt="${t.id}" rows="2" placeholder="这项测试追加的提示词，可留空">${esc(t.prompt)}</textarea></div><button class="btn xs danger" data-act="robust-remove" data-id="${t.id}">删除</button></div>`).join('')}</div>
+    <div class="row-inline"><button class="btn" data-act="robust-add">＋添加测试项</button><button class="btn pri" data-act="robust-run">生成已勾选项目</button></div>
   </section>
   <div id="robustResults" class="robust-results">${S.robustResults.map((r,i)=>`<div class="robust-result glass"><b>${esc(r.name)}</b><img src="${r.url}" data-act="robust-preview" data-i="${i}" alt=""><p class="muted sm">${esc(r.prompt)}</p></div>`).join('')}</div>`;
 }
@@ -2182,10 +2192,10 @@ function renderSettings(main) {
      ${sel('gpt.mode', '接口格式', [['images', 'images/generations'], ['chat', 'chat/completions（回复里带图）'], ['chami', '茶蘼 GPT（SSE 流式）']])}
      ${fld('gpt.base', '接口地址 / 域名', '默认使用 https://chamigpt.bornais.workers.dev；接口路径自动拼接')}
      ${fld('gpt.key', 'GPT 线单个 API Key（不要用 NAI 组合 Key）', '', 'password')}
-     ${fld('gpt.model', '通用 GPT 模型名', 'gpt-image-1')}
-     <label class="field"><span>茶蘼 GPT 模型</span><select data-set="gpt.chamiModel"><option value="gpt-image-2" ${(SET.gpt.chamiModel || 'gpt-image-2') === 'gpt-image-2' ? 'selected' : ''}>gpt-image-2</option><option value="gpt-image-2.5" ${SET.gpt.chamiModel === 'gpt-image-2.5' ? 'selected' : ''}>gpt-image-2.5</option></select></label>
-     <p class="muted sm">茶蘼 GPT 使用 /GPTimage/chami/v1/chat/completions，必须 stream=true；模型可选 gpt-image-2 或 gpt-image-2.5。错误不会自动重试。</p>
-     <label class="field"><span>GPT 画风规范（自然语言，各处 GPT 生图共用）</span><textarea rows="3" data-set="gpt.stylePrompt" placeholder="例如：自然、克制的光影，细腻材质，避免过度锐化……">${esc(SET.gpt.stylePrompt || '')}</textarea></label>
+     ${fld('gpt.model', '模型名（通用 GPT / 茶蘼 GPT 共用）', 'gpt-image-2 或 gpt-image-2.5')}
+     <p class="muted sm">前端只维护一个模型名；接口格式决定后端调用路径。茶蘼 GPT 仍使用 SSE 接口，模型名直接使用上方填写值。</p>
+     <label class="field"><span>GPT 画风规范（自然语言，各处 GPT 生图共用）</span><textarea id="gptStylePrompt" rows="3" data-set="gpt.stylePrompt" placeholder="例如：自然、克制的光影，细腻材质，避免过度锐化……">${esc(SET.gpt.stylePrompt || '')}</textarea></label>
+     <div class="srow wrap"><select id="gptStylePreset" class="inp" style="flex:1;min-width:180px"><option value="">选择画风规范预设…</option>${(SET.gpt.stylePresets||[]).map((p,i)=>`<option value="${i}">${esc(p.name)}</option>`).join('')}</select><button class="btn sm" data-act="gpt-style-save">保存当前规范</button><button class="btn sm ghost" data-act="gpt-style-delete" disabled>删除预设</button></div>
      ${sel('gpt.size', '尺寸', [['1024x1536', '1024×1536 竖'], ['1536x1024', '1536×1024 横'], ['1024x1024', '1024×1024 方']])}
    </section>
    <section class="scard glass"><h3>${ic('rows')}模型名映射<span class="muted">V5 出来时在这里加一行，不用改代码</span></h3>
@@ -2201,6 +2211,8 @@ function renderSettings(main) {
    </section>
    <section class="scard glass"><h3>${ic('folder')}备份与数据</h3>
      <div class="srow wrap"><button class="btn" data-act="export-full">导出备份（含图片）</button><button class="btn" data-act="export-data">导出备份（仅数据）</button><button class="btn" data-act="import">导入备份</button></div>
+     <div class="srow wrap"><button class="btn pri" data-act="import-tavern">导入酒馆画师串（支持多选 JSON）</button><button class="btn" data-act="export-tavern-selected">导出已选酒馆画师串</button></div>
+     <p class="muted sm">酒馆格式与画谱数据备份分开：导入会保留正负面提示词和内嵌参考图；导出请先到画师串页开启多选并选中条目。</p>
      <div class="srow wrap"><button class="btn" data-act="reparse">重新分词全部串</button><button class="btn" data-act="reset-ai">清空 AI 分类缓存</button></div>
      ${sel('theme', '外观', [['auto', '跟随系统'], ['light', '浅色'], ['dark', '深色']])}
      <p class="muted sm">本机共 ${S.entries.length} 条串、${S.vibes.length} 个 vibe、${Object.keys(S.tags).length} 个已分类的词。</p>
@@ -2329,7 +2341,7 @@ function entryEditor(e, { focusGen = false, initialPrompt = '', initialNegative 
   $('#edSampler',m).value = d.params?.sampler || SET.nai.sampler || 'k_euler_ancestral'; $('#edNoise',m).value = d.params?.noiseSchedule || SET.nai.noiseSchedule || 'karras'; $('#edUC',m).value = String(d.params?.ucPreset ?? SET.nai.ucPreset ?? 2);
   $('#edCharPrompts',m).closest('.field').insertAdjacentHTML('afterend','<label class="field"><span>角色位置（每行 x,y；0–1，留空自动）</span><textarea id="edCharPositions" rows="2" placeholder="0.3,0.5&#10;0.7,0.5">'+esc(d.charPositions || '')+'</textarea></label>');
   const showImg = blob => { const u = URL.createObjectURL(blob); $('#edImg', m).innerHTML = `<img src="${u}" class="ld" alt="">`; $('#edImg',m).dataset.fullsrc=u; $('#edImg',m).style.cursor="zoom-in"; };
-  $('#edImg',m).onclick = () => { const src=$('#edImg',m).dataset.fullsrc; if(!src) return; openModal(`<div style="max-height:80vh;display:grid;place-items:center"><img src="${src}" style="max-width:100%;max-height:78vh;object-fit:contain;border-radius:12px"></div><div class="m-actions"><button class="btn" data-act="close">关闭</button></div>`,{wide:true}); };
+  $('#edImg',m).onclick = async () => { let src=$('#edImg',m).dataset.fullsrc || $('#edImg img',m)?.src; if(!src && e?.thumbId)src=await blobURL(e.thumbId); if(src)openImagePreview(src,'画师串图片'); };
   $('#edUp', m).onclick = () => pickFile('image/*', false, async fs => { if (!fs[0]) return; st.img = { blob: fs[0], source: null }; showImg(fs[0]); });
   const num = id => { const v = $(id, m).value; return v === '' ? null : +v; };
 
@@ -2786,14 +2798,15 @@ const ACT = {
   'artist-index-tab': el => { S.artistTab = el.dataset.tab; render(); },
   'style-filter': el => { Object.assign(S.filters,{q:el.dataset.n,model:'',vibe:'any',star:false,folder:'',recipe:false,artist:''}); S.view='library'; render(); window.scrollTo({top:0}); },
   'style-index-add': async () => { const n=await promptText('添加常用风格词','','输入原始英文标签'); if(!n)return; const k=normTag(n); S.tags[k]={c:'style',m:1}; await saveTags(); render(); toast('已加入风格词索引'); },
-  'robust-add': () => { SET.robust ||= {}; SET.robust.tests ||= []; SET.robust.tests.push({id:uid(),name:'自定义测试',prompt:''}); saveSettings(); render(); },
+  'robust-add': () => { SET.robust ||= {}; SET.robust.tests ||= []; SET.robust.tests.push({id:uid(),name:'自定义测试',prompt:'',enabled:false}); saveSettings(); render(); },
   'robust-remove': el => { SET.robust.tests=(SET.robust?.tests||[]).filter(x=>x.id!==el.dataset.id); saveSettings(); render(); },
   'robust-run': async () => {
-    const base=$('#robustBase')?.value.trim(); if(!base)return toast('先填写基准画师串');
-    SET.robust ||= {}; SET.robust.base=base; SET.robust.negative=$('#robustNeg')?.value||'';
-    SET.robust.tests=[...$('[data-rname]')].map(x=>({id:x.dataset.rname,name:x.value,prompt:$('[data-rprompt="'+x.dataset.rname+'"]')?.value||''})); saveSettings();
+    const selectedIds=[...($('#robustLibrary')?.selectedOptions||[])].map(x=>x.value);SET.robust.libraryEntryIds=selectedIds;const libraryBase=S.entries.filter(e=>selectedIds.includes(e.id)).map(e=>e.prompt||'').filter(Boolean);
+    const manualBase=$('#robustBase')?.value.trim()||'';SET.robust.base=manualBase;const base=[...libraryBase,manualBase].filter(Boolean).join(', ');if(!base)return toast('先从画谱选择画师串，或手动填写基准串');
+    SET.robust.negative=$('#robustNeg')?.value||'';
+    SET.robust.tests=[...$('[data-rname]')].map(x=>({id:x.dataset.rname,name:x.value,prompt:$('[data-rprompt="'+x.dataset.rname+'"]')?.value||'',enabled:!!$('[data-renabled="'+x.dataset.rname+'"]')?.checked}));saveSettings();
     if(!SET.nai.key)return toast('先在设置里填写 NAI 生图 Key');
-    const tests=SET.robust.tests.filter(x=>x.name.trim()); if(!tests.length)return toast('至少保留一个测试项');
+    const tests=SET.robust.tests.filter(x=>x.enabled&&x.name.trim());if(!tests.length)return toast('至少勾选一个测试项');
     S.robustResults=[]; render();
     for(let i=0;i<tests.length;i++){
       const t=tests[i]; const msg=toast('鲁棒测试生成中 '+(i+1)+' / '+tests.length+'：'+esc(t.name),600000);
@@ -2803,7 +2816,7 @@ const ACT = {
     }
     toast('鲁棒测试完成');
   },
-  'robust-preview': el => { const r=S.robustResults[+el.dataset.i]; if(!r?.url)return; const m=openModal('<img style="display:block;max-width:90vw;max-height:82vh;margin:auto;object-fit:contain" src="'+r.url+'"><div class="m-actions"><button class="btn" data-act="close">关闭</button></div>',{wide:true}); },
+  'robust-preview': el => { const r=S.robustResults[+el.dataset.i];if(r?.url)openImagePreview(r.url,r.name||'鲁棒测试结果'); },
   'wish-generate': () => generateWish(),
   'wish-revise': () => reviseWish(),
   'wish-ref-remove': el => { const i=+el.dataset.i,x=S.wishReferenceImages?.[i]; if(x)URL.revokeObjectURL(x.url); S.wishReferenceImages.splice(i,1); render(); },
@@ -2844,6 +2857,10 @@ const ACT = {
     } finally { el.disabled = false; el.classList.remove('loading'); }
   },
   'test-text': async el => { el.disabled = true; try { const t = await aiChat([{ role: 'user', content: '只回复 JSON：{"ok":true}' }]); toast('连接正常：' + esc(t.slice(0, 60))); } catch (err) { toast('失败：' + esc(err.message), 6000); } finally { el.disabled = false; } },
+  'gpt-style-save': async () => {const value=($('#gptStylePrompt')?.value||'').trim();if(!value)return toast('画风规范为空，无法保存');const name=await promptText('保存 GPT 画风规范预设','','例如：柔和半厚涂');if(!name)return;SET.gpt.stylePresets||=[];const old=SET.gpt.stylePresets.find(p=>p.name===name);if(old)old.text=value;else SET.gpt.stylePresets.push({name,text:value});saveSettings();render();toast('GPT 画风规范预设已保存');},
+  'gpt-style-delete': async () => {const sel=$('#gptStylePreset'),i=+(sel?.value??-1),p=SET.gpt.stylePresets?.[i];if(!p)return;if(!await ask('删除这个画风规范预设？',p.name,[{t:'取消',v:false},{t:'删除',v:true,cls:'danger'}]))return;SET.gpt.stylePresets.splice(i,1);saveSettings();render();toast('预设已删除');},
+  'import-tavern': () => pickFile('.json,application/json',true,importTavernFiles),
+  'export-tavern-selected': () => exportTavernSelected(),
   'export-full': () => exportAll(true),
   'export-data': () => exportAll(false),
   import: () => pickFile('.json,application/json', false, fs => fs[0] && importLib(fs[0])),
@@ -2871,6 +2888,9 @@ document.addEventListener('pointerdown', ev => {
 document.addEventListener('change', ev => {
   const t = ev.target;
   if (t.id === 'wishRefInput') { addWishReferenceImages([...t.files]); return; }
+  if(t.id==='robustLibrary'){SET.robust||={};SET.robust.libraryEntryIds=[...t.selectedOptions].map(o=>o.value);saveSettings();const p=$('#robustBasePreview');if(p)p.textContent=[...S.entries.filter(e=>SET.robust.libraryEntryIds.includes(e.id)).map(e=>e.prompt||''),$('#robustBase')?.value||''].filter(Boolean).join(', ')||'（尚未选择或输入）';return;}
+  if(t.dataset.renabled){const x=(SET.robust?.tests||[]).find(x=>x.id===t.dataset.renabled);if(x)x.enabled=t.checked;saveSettings();return;}
+  if(t.id==='gptStylePreset'){const p=SET.gpt.stylePresets?.[+t.value];if(p){SET.gpt.stylePrompt=p.text;const a=$('#gptStylePrompt');if(a)a.value=p.text;saveSettings();}const d=$('[data-act="gpt-style-delete"]');if(d)d.disabled=!p;return;}
   if (t.id === 'wishBaseSelect') { S.wishBaseEntryId=t.value; render(); return; }
   if (t.dataset.wpart !== undefined) { S.wishLocalParts=[...new Set($('[data-wpart]:checked').map(x=>x.dataset.wpart))]; return; }
   if (t.dataset.wpreset !== undefined) { composeWishNegative(); return; }
@@ -2905,7 +2925,7 @@ document.addEventListener('input', ev => {
   else if (t.id === 'wishLocalDirection') S.wishCustomPart=t.value;
   else if (t.id === 'wishCustomParts') S.wishCustomParts=t.value;
   else if (t.id === 'wishRevision') S.wishRevision=t.value;
-  else if (t.id === 'robustBase') { SET.robust ||= {}; SET.robust.base=t.value; saveSettings(); }
+  else if (t.id === 'robustBase') { SET.robust ||= {}; SET.robust.base=t.value; saveSettings(); const p=$('#robustBasePreview');if(p)p.textContent=[...(S.entries.filter(e=>(SET.robust.libraryEntryIds||[]).includes(e.id)).map(e=>e.prompt||'')),t.value].filter(Boolean).join(', ')||'（尚未选择或输入）'; }
   else if (t.dataset.rname || t.dataset.rprompt) {
     SET.robust ||= {}; SET.robust.tests ||= [];
     const id=t.dataset.rname||t.dataset.rprompt; let x=SET.robust.tests.find(x=>x.id===id);
@@ -3397,6 +3417,8 @@ function coverModal(c) {
   </div>
   <div class="m-actions"><button type="button" class="btn" data-act="close">关闭</button><button type="button" class="btn pri" id="cvSet" disabled>设为封面</button></div>`, { wide: true, cls: 'editor' });
   let coverEngine = 'nai';
+  $('#cvImg',m).style.cursor='zoom-in';
+  $('#cvImg',m).onclick = async () => { let src=$('#cvImg img',m)?.src; if(!src && c.thumbId)src=await blobURL(c.thumbId); if(src)openImagePreview(src,'角色卡封面'); };
   const P = () => [$('#cvArt', m).value.trim(), $('#cvP', m).value.trim(), coverEngine === 'nai' ? SET.nai.quality : ($('#cvUseStyle',m).checked ? SET.gpt.stylePrompt : '')].filter(Boolean).join(', ');
   const setCoverEngine = engine => {
     coverEngine = engine;
@@ -3433,7 +3455,7 @@ function coverModal(c) {
     try {
       if (coverEngine === 'gpt') { st.blob = await genGPT({ prompt: P(), size: '1024x1536' }); st.seed = null; }
       else { const r = await genNAI({ prompt: P(), negative: $('#cvN', m).value.trim(), model: $('#cvM', m).value, size: '832x1216', cfgRescale: SET.nai.cfgRescale, ucPreset: SET.nai.ucPreset, noiseSchedule: SET.nai.noiseSchedule, qualityToggle: SET.nai.qualityToggle }); st.blob = r.blob; st.seed = r.seed; }
-      $('#cvImg', m).innerHTML = `<img src="${URL.createObjectURL(st.blob)}" class="ld" alt="">`;
+      $('#cvImg', m).innerHTML = `<img src="${URL.createObjectURL(st.blob)}" class="ld" alt="">`; $('#cvImg',m).style.cursor='zoom-in';
       $('#cvSet', m).disabled = false; msg.textContent = '满意就点"设为封面"，不满意再点生成';
     } catch (err) { msg.textContent = '失败：' + err.message; }
     finally { b.disabled = false; b.classList.remove('loading'); }
