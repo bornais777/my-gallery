@@ -608,7 +608,7 @@ body[data-view=cards] .fab,body[data-view=story] .fab,body[data-view=settings] .
 .wish-analysis,.wish-axis-suggest{padding:12px;border:1px solid var(--line);border-radius:var(--r2);margin:12px 0;background:var(--glass)}
 .wish-analysis p{margin:5px 0 10px;color:var(--muted);font-size:13px;line-height:1.55}
 .wish-axis-chips{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0}
-.image-preview-modal .modal{width:min(96vw,1200px)}.image-preview-stage{display:grid;place-items:center;max-height:82vh;min-height:200px;overflow:auto;background:rgba(0,0,0,.08);border-radius:14px;padding:10px}.image-preview-stage img{max-width:100%;max-height:78vh;object-fit:contain;border-radius:10px}.image-preview-head{padding:4px 2px 12px}.robust-panel{display:flex;flex-direction:column;gap:14px}.robust-source select,.robust-panel select[multiple]{min-height:120px}.robust-base-preview{padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--field)}.robust-test-head{display:flex;align-items:center;gap:12px;margin-top:8px}.robust-test{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--field);margin:8px 0}.robust-enable{display:flex;justify-content:center;padding-top:8px}.robust-test-fields{display:grid;gap:8px;min-width:0}.robust-test-fields input,.robust-test-fields textarea{width:100%;min-width:0}.robust-results{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:16px}.robust-result img{cursor:zoom-in}.ed-img,#cvImg{cursor:zoom-in}
+.image-preview-modal .modal{width:min(96vw,1200px)}.image-preview-stage{display:grid;place-items:center;max-height:82vh;min-height:200px;overflow:auto;background:rgba(0,0,0,.08);border-radius:14px;padding:10px}.image-preview-stage img{max-width:100%;max-height:78vh;object-fit:contain;border-radius:10px}.image-preview-head{padding:4px 2px 12px}.robust-panel{display:flex;flex-direction:column;gap:14px}.robust-source select,.robust-panel select[multiple]{min-height:120px}.robust-base-preview{padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--field)}.robust-test-head{display:flex;align-items:center;gap:12px;margin-top:8px}.robust-test{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--field);margin:8px 0}.robust-enable{display:flex;justify-content:center;padding-top:8px}.robust-enable input{width:17px;height:17px;accent-color:var(--accent);cursor:pointer}.robust-test:focus-within{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}.robust-test:hover{border-color:var(--accent)}.robust-test-fields{display:grid;gap:8px;min-width:0}.robust-test-fields textarea{min-height:58px;resize:vertical}.robust-test-fields input,.robust-test-fields textarea{width:100%;min-width:0}.robust-results{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:16px}.robust-result img{cursor:zoom-in}.ed-img,#cvImg{cursor:zoom-in}
 </style>
 </head>
 <body>
@@ -1213,6 +1213,7 @@ async function genGPT({ prompt, size }) {
   const g = SET.gpt; if (!g.key) throw new Error('先在设置里填 GPT 生图 API');
   if (g.mode === 'chami') {
     const base = (g.base || 'https://chamigpt.bornais.workers.dev').trim().replace(/\/+$/, '');
+    const model = g.chamiModel || g.model || 'gpt-image-2';
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 300000);
     let r, raw;
@@ -1220,7 +1221,7 @@ async function genGPT({ prompt, size }) {
       r = await fetch(base + '/GPTimage/chami/v1/chat/completions', {
         method: 'POST',
         headers: hdr(g.key),
-        body: JSON.stringify({ model: g.model || g.chamiModel || 'gpt-image-2', messages: [{ role: 'user', content: prompt }], size: size || g.size || '1024x1024', stream: true }),
+        body: JSON.stringify({ model, messages: [{ role: 'user', content: prompt }], size: size || g.size || '1024x1024', stream: true }),
         signal: ctrl.signal,
       });
       raw = await r.text();
@@ -1521,7 +1522,6 @@ async function exportAll(withBlobs) {
     download(`huapu-${withBlobs ? 'full' : 'data'}-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}.json`, new Blob([JSON.stringify(data)], { type: 'application/json' }));
   } finally { t.remove(); }
 }
-async 
 async function importTavernFiles(files){let added=0,images=0,failed=0;for(const file of files){try{const data=JSON.parse(await file.text()),items=Array.isArray(data)?data:(Array.isArray(data.presets)?data.presets:null);if(!items)throw new Error('不是酒馆画师串 JSON 数组');for(const item of items){const prompt=String(item.positivePrompt??item.prompt??'').trim(),negative=String(item.negativePrompt??item.negative??'');if(!prompt)continue;const e={id:uid(),createdAt:now()+added,source:'text',star:false,prompt,negative,chars:[],params:{},vibes:[],tokens:tokenize(prompt),folderId:S.filters.folder&&S.filters.folder!=='__none'?S.filters.folder:'',note:String(item.name||'酒馆导入')};const ref=typeof item.referenceImage==='string'?item.referenceImage:'';if(ref.startsWith('data:image/')){const blob=await(await fetch(ref)).blob();await attachImage(e,blob);images++;}await putEntry(e);added++;}}catch(err){failed++;toast(file.name+'：'+err.message,6000);}}render();toast(`酒馆导入完成：${added} 条，恢复图片 ${images} 张，失败文件 ${failed} 个`);}
 async function exportTavernSelected(){const selected=S.entries.filter(e=>S.selected.has(e.id));if(!selected.length)return toast('请先到画师串页开启多选并选中要导出的串');const out=[];for(let i=0;i<selected.length;i++){const e=selected[i];let referenceImage=null;if(e.origId){const b=await getBlob(e.origId);if(b){referenceImage=`data:${b.type||'image/png'};base64,${await blobToB64(b)}`;}}out.push({name:e.note||artistsOf(e).map(a=>a.n).join('、')||'画师串 '+(i+1),positivePrompt:e.prompt||'',negativePrompt:e.negative||'',sequence:i,referenceImage,thumbnail:null});}const d=new Date(),stamp=d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');download('huapu-tavern-presets-'+stamp+'.json',new Blob([JSON.stringify(out,null,2)],{type:'application/json'}));toast(`已导出 ${out.length} 条酒馆格式画师串`);}
 
@@ -2193,8 +2193,9 @@ function renderSettings(main) {
      ${sel('gpt.mode', '接口格式', [['images', 'images/generations'], ['chat', 'chat/completions（回复里带图）'], ['chami', '茶蘼 GPT（SSE 流式）']])}
      ${fld('gpt.base', '接口地址 / 域名', '默认使用 https://chamigpt.bornais.workers.dev；接口路径自动拼接')}
      ${fld('gpt.key', 'GPT 线单个 API Key（不要用 NAI 组合 Key）', '', 'password')}
-     ${fld('gpt.model', '模型名（通用 GPT / 茶蘼 GPT 共用）', 'gpt-image-2 或 gpt-image-2.5')}
-     <p class="muted sm">前端只维护一个模型名；接口格式决定后端调用路径。茶蘼 GPT 仍使用 SSE 接口，模型名直接使用上方填写值。</p>
+     ${fld('gpt.model', '通用 GPT 模型名（images / chat 接口）', '例如 gpt-image-1')}
+     ${fld('gpt.chamiModel', '茶蘼 GPT 模型名（SSE 接口）', '例如 gpt-image-2 或 gpt-image-2.5')}
+     <p class="muted sm">前端统一配置入口；选择接口格式后，自动使用对应的模型名和调用路径。两个模型名可以分别填写。</p>
      <label class="field"><span>GPT 画风规范（自然语言，各处 GPT 生图共用）</span><textarea id="gptStylePrompt" rows="3" data-set="gpt.stylePrompt" placeholder="例如：自然、克制的光影，细腻材质，避免过度锐化……">${esc(SET.gpt.stylePrompt || '')}</textarea></label>
      <div class="srow wrap"><select id="gptStylePreset" class="inp" style="flex:1;min-width:180px"><option value="">选择画风规范预设…</option>${(SET.gpt.stylePresets||[]).map((p,i)=>`<option value="${i}">${esc(p.name)}</option>`).join('')}</select><button class="btn sm" data-act="gpt-style-save">保存当前规范</button><button class="btn sm ghost" data-act="gpt-style-delete" disabled>删除预设</button></div>
      ${sel('gpt.size', '尺寸', [['1024x1536', '1024×1536 竖'], ['1536x1024', '1536×1024 横'], ['1024x1024', '1024×1024 方']])}
@@ -2342,7 +2343,7 @@ function entryEditor(e, { focusGen = false, initialPrompt = '', initialNegative 
   $('#edSampler',m).value = d.params?.sampler || SET.nai.sampler || 'k_euler_ancestral'; $('#edNoise',m).value = d.params?.noiseSchedule || SET.nai.noiseSchedule || 'karras'; $('#edUC',m).value = String(d.params?.ucPreset ?? SET.nai.ucPreset ?? 2);
   $('#edCharPrompts',m).closest('.field').insertAdjacentHTML('afterend','<label class="field"><span>角色位置（每行 x,y；0–1，留空自动）</span><textarea id="edCharPositions" rows="2" placeholder="0.3,0.5&#10;0.7,0.5">'+esc(d.charPositions || '')+'</textarea></label>');
   const showImg = blob => { const u = URL.createObjectURL(blob); $('#edImg', m).innerHTML = `<img src="${u}" class="ld" alt="">`; $('#edImg',m).dataset.fullsrc=u; $('#edImg',m).style.cursor="zoom-in"; };
-  $('#edImg',m).onclick = async () => { let src=$('#edImg',m).dataset.fullsrc || $('#edImg img',m)?.src; if(!src && e?.thumbId)src=await blobURL(e.thumbId); if(src)openImagePreview(src,'画师串图片'); };
+  $('#edImg',m).onclick = async () => { let src=$('#edImg',m).dataset.fullsrc; if(!src && e)src=await blobURL(e.origId || e.thumbId); if(src)openImagePreview(src,'画师串图片'); };
   $('#edUp', m).onclick = () => pickFile('image/*', false, async fs => { if (!fs[0]) return; st.img = { blob: fs[0], source: null }; showImg(fs[0]); });
   const num = id => { const v = $(id, m).value; return v === '' ? null : +v; };
 
@@ -3259,7 +3260,7 @@ function cardMain(c) {
   const tabs = [['base', '基础'], ['lore', `世界书 ${nb}`], ['regex', `正则 ${nr}`], ['lab', 'AI 正则 · 沙盒']];
   return `<div class="chead glass">
     <button class="btn icon-btn ghost cback" data-act="card-back" aria-label="返回列表">${ic('chev')}</button>
-    <div class="cbig" data-act="card-cover" data-cid="${c.id}" title="封面">${c.thumbId ? `<img data-blob="${c.thumbId}" alt="">` : `<i>${esc((d.name || '?').slice(0, 1))}</i>`}<span>${ic('wand', 13)}</span></div>
+    <div class="cbig" data-act="card-cover" data-cid="${c.id}" title="封面">${c.thumbId ? `<img data-blob="${c.thumbId}" data-act="card-cover-preview" data-cid="${c.id}" alt="" title="点击查看原图">` : `<i>${esc((d.name || '?').slice(0, 1))}</i>`}<span>${ic('wand', 13)}</span></div>
     <div class="ctitle"><h2>${esc(d.name || '未命名')}</h2><p class="muted sm">${esc(c.src || '')}${d.creator ? ' · ' + esc(d.creator) : ''} · ${c.spec === 'chara_card_v3' ? 'V3' : 'V2'}</p>
       <div class="cbtns"><button class="btn sm" data-act="card-cover" data-cid="${c.id}">${ic('wand', 13)}一键配图</button>
       <button class="btn sm" data-act="card-img" data-cid="${c.id}">${ic('image', 13)}换封面</button>
@@ -3419,7 +3420,7 @@ function coverModal(c) {
   <div class="m-actions"><button type="button" class="btn" data-act="close">关闭</button><button type="button" class="btn pri" id="cvSet" disabled>设为封面</button></div>`, { wide: true, cls: 'editor' });
   let coverEngine = 'nai';
   $('#cvImg',m).style.cursor='zoom-in';
-  $('#cvImg',m).onclick = async () => { let src=$('#cvImg img',m)?.src; if(!src && c.thumbId)src=await blobURL(c.thumbId); if(src)openImagePreview(src,'角色卡封面'); };
+  $('#cvImg',m).onclick = async () => { let src=$('#cvImg img',m)?.dataset.fullsrc; if(!src)src=await blobURL(c.avatarId || c.thumbId); if(src)openImagePreview(src,'角色卡封面'); };
   const P = () => [$('#cvArt', m).value.trim(), $('#cvP', m).value.trim(), coverEngine === 'nai' ? SET.nai.quality : ($('#cvUseStyle',m).checked ? SET.gpt.stylePrompt : '')].filter(Boolean).join(', ');
   const setCoverEngine = engine => {
     coverEngine = engine;
@@ -3456,7 +3457,7 @@ function coverModal(c) {
     try {
       if (coverEngine === 'gpt') { st.blob = await genGPT({ prompt: P(), size: '1024x1536' }); st.seed = null; }
       else { const r = await genNAI({ prompt: P(), negative: $('#cvN', m).value.trim(), model: $('#cvM', m).value, size: '832x1216', cfgRescale: SET.nai.cfgRescale, ucPreset: SET.nai.ucPreset, noiseSchedule: SET.nai.noiseSchedule, qualityToggle: SET.nai.qualityToggle }); st.blob = r.blob; st.seed = r.seed; }
-      $('#cvImg', m).innerHTML = `<img src="${URL.createObjectURL(st.blob)}" class="ld" alt="">`; $('#cvImg',m).style.cursor='zoom-in';
+      const previewUrl=URL.createObjectURL(st.blob); $('#cvImg', m).innerHTML = `<img src="${previewUrl}" data-fullsrc="${previewUrl}" class="ld" alt="">`; $('#cvImg',m).style.cursor='zoom-in';
       $('#cvSet', m).disabled = false; msg.textContent = '满意就点"设为封面"，不满意再点生成';
     } catch (err) { msg.textContent = '失败：' + err.message; }
     finally { b.disabled = false; b.classList.remove('loading'); }
@@ -3481,6 +3482,7 @@ Object.assign(ACT, {
   'card-back': () => { S.curCard = null; render(); },
   'card-tab': el => { S.cardTab = el.dataset.t; render(); },
   'card-cover': el => { const c = S.cards.find(x => x.id === el.dataset.cid); if (c) coverModal(c); },
+  'card-cover-preview': async el => { const c = S.cards.find(x => x.id === el.dataset.cid); if (!c) return; const src = await blobURL(c.avatarId || c.thumbId); if (src) openImagePreview(src, '角色卡封面 · ' + (c.data.name || '未命名')); },
   'card-img': el => { const c = S.cards.find(x => x.id === el.dataset.cid); if (!c) return; pickFile('image/*', false, async fs => { if (!fs[0]) return; await setCardImage(c, fs[0]); await putCard(c); render(); }); },
   'card-export': async el => { const c = S.cards.find(x => x.id === el.dataset.cid); if (!c) return; clearTimeout(cardTimers.get(c.id)); await putCard(c); try { await exportCard(c, el.dataset.k); } catch (err) { toast('导出失败：' + esc(err.message), 5000); } },
   'card-del': async el => { const c = S.cards.find(x => x.id === el.dataset.cid); if (!c) return; if (!await ask(`删除角色卡「${esc(c.data.name)}」？`, '无法撤销。建议先导出一份。', [{ t: '取消', v: false }, { t: '删除', v: true, cls: 'danger' }])) return; await deleteCard(c.id); S.curCard = null; render(); },
