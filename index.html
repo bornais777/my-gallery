@@ -2091,8 +2091,8 @@ async function generateWish() {
   if(!aiReady())return toast('先在设置里配置支持看图的文字 API');
   const idea=($('#wishIdea')?.value||'').trim(),refs=S.wishReferenceImages||[],baseEntry=byId(S.wishBaseEntryId),localParts=[...new Set($('[data-wpart]:checked').map(x=>x.dataset.wpart))],localDirection=$('#wishLocalDirection')?.value||'',customParts=$('#wishCustomParts')?.value||'';
   S.wishLocalParts=localParts;S.wishCustomPart=localDirection;S.wishCustomParts=customParts;
-  if(!idea&&!refs.length)return toast('请填写风格描述或上传参考图片');
-  if(refs.length&&SET.text.provider==='deepseek')return toast('当前 DeepSeek 接口不支持图片输入，请切换到支持视觉输入的模型');
+  if(!idea&&!refs.length&&!baseEntry)return toast('请填写风格描述、上传参考图片或选择已有画师串');
+  if((refs.length||baseEntry?.thumbId)&&SET.text.provider==='deepseek')return toast('当前 DeepSeek 接口不支持图片输入，请切换到支持视觉输入的模型');
   S.wishIdea=idea;
   const axes={};$$('[data-waxis]').forEach(x=>axes[x.dataset.waxis]=+x.value);S.wishAxes={...S.wishAxes,...axes};
   const artistCounts=new Map(),styleCounts=new Map();
@@ -2101,7 +2101,7 @@ async function generateWish() {
   const artists=[...artistCounts].sort((a,b)=>score(b[0],b[1])-score(a[0],a[1])||b[1]-a[1]).slice(0,220).map(([name,count])=>({name,count}));
   const styles=[...styleCounts].sort((a,b)=>score(b[0],b[1])-score(a[0],a[1])||b[1]-a[1]).slice(0,320).map(([name,count])=>({name,count}));
   const presets=(SET.nai.negPresets||[]).map(p=>({name:p.name,text:p.text}));
-  const wait=toast(refs.length?'正在观察参考图并定位画风…':'正在根据描述和视觉轴条分析收藏…',600000);
+  const wait=toast((refs.length||baseEntry?.thumbId)?'正在观察已有串和参考图并定位画风…':'正在根据描述和视觉轴条分析收藏…',600000);
   try{
     const system='你是插画风格逆向分析与画师串策划助手。核心任务是提取风格，不是描述图片内容。严禁把人物身份、性别、年龄、外貌细节、服装、动作、姿势、构图、镜头、物件、地点、背景等画面内容写入风格词或提示词；只分析绘画媒介、笔触、渲染、色彩、明暗、边缘、质感、面部绘制方式等可迁移的风格特征。不得根据图片猜测或声称真实作者身份。画师名称必须严格从给定收藏名单选择，不能创造；如果没有可信匹配可以少选甚至不选，禁止用常见画师凑数。画师权重由目标匹配度决定，范围0.1到3。风格词以库内词为参考，但可以组合、改写或创造新的英文风格标签，每个词给0.1到3权重。负面预设只能从给定预设中选择并返回原名；另可按本次风格提出少量针对性负面词并给权重。厚重不等于高饱和，柔和过渡不等于低对比；美型程度与面部成熟度必须区分。请输出风格指纹、分层特征、可信度、轴条建议、候选画师差异说明。只返回JSON：{"fingerprint":"风格指纹","layers":"整体/人物绘制方式/笔触/色彩/光影的风格特征","confidence":"高/中/低及简短理由","axis_suggestions":{"weight":50,"saturation":50,"realism":50,"contrast":50,"softness":50,"detail":50,"beauty":65,"maturity":50},"artists":[{"name":"库内原名","weight":1.2}],"artist_comparisons":[{"name":"库内原名","match":"接近点","gap":"与参考的差异"}],"style_tags":[{"tag":"semi-realistic","weight":1.1}],"new_styles":[{"tag":"painterly rendering","weight":1.2}],"negative_presets":["预设原名"],"negative_tags":[{"tag":"rough texture","weight":0.8}],"reason":"简短说明"}';
     const userText='风格描述：'+(idea||'未提供，请仅依据图片提取画风')+'\\n已有画师串（若提供，作为待调整基底，不要无理由推翻）：'+(baseEntry?JSON.stringify({prompt:baseEntry.prompt,negative:baseEntry.negative||''}):'无')+'\\n局部约束部位：'+JSON.stringify(localParts)+'\\n局部调整方向：'+(localDirection||'未提供')+'\\n自定义局部项目：'+(customParts||'无')+'\\n参考图片数量：'+refs.length+'（拼图中按编号区分）\\n视觉轴条（0=左，100=右）：'+JSON.stringify(axes)+'\\n轴条：厚重程度、色彩饱和度、写实程度、明暗反差、边缘过渡、细节密度、人物美型倾向、面部成熟度（青涩柔和→成熟清晰）。图片分析必须排除场景内容，只保留风格。\\n库内画师（只能从这里选择，权重可调）：'+JSON.stringify(artists)+'\\n库内风格词（参考，可创造新词）：'+JSON.stringify(styles)+'\\n已有负面预设（只能选，不可改名）：'+JSON.stringify(presets)+'\\n请形成可迁移到其他题材的风格方案。';
@@ -2127,11 +2127,11 @@ async function generateWish() {
 async function reviseWish(){
   const w=S.wishResult;if(!w)return toast('请先生成第一版方案');
   const instruction=($('#wishRevision')?.value||'').trim();if(!instruction)return toast('请先写明要调整的地方');
-  const prompt=$('#wishFull')?.value??w.prompt,negative=$('#wishNegative')?.value??w.negativePrompt,refs=S.wishReferenceImages||[];
+  const prompt=$('#wishFull')?.value??w.prompt,negative=$('#wishNegative')?.value??w.negativePrompt,refs=S.wishReferenceImages||[],baseEntry=byId(S.wishBaseEntryId);
   const wait=toast('正在按要求调整提示词…',600000);
   try{
     const system='你是提示词迭代编辑器。根据用户指出的问题，只修改指定部分；未提及的风格特征、画师串、权重和负面约束尽量原样保留。若需要替换某个局部特征，使用明确的正面目标描述，不要只写“不要某某”。不得凭空添加画师；保留原提示词中已有画师标签，除非用户明确要求修改。只返回 JSON：{"prompt":"完整的新正面提示词","negative_prompt":"完整的新负面提示词","note":"本次改动摘要"}。这是文本提示词修订，不是图片编辑。';
-    const image=refs.length?await makeWishReferenceSheet(refs.map(x=>x.file)):null;
+    const baseImage=baseEntry?.thumbId?await getBlob(baseEntry.thumbId):null,imageFiles=[...(baseImage?[baseImage]:[]),...refs.map(x=>x.file)],image=imageFiles.length?await makeWishReferenceSheet(imageFiles):null;
     const user='当前正面提示词：\\n'+prompt+'\\n当前负面提示词：\\n'+negative+'\\n用户本次修改要求：\\n'+instruction+'\\n请输出修改后的完整正负面提示词，并保留未提及部分。';
     const j=parseJSONLoose(await aiChat([{role:'system',content:system},{role:'user',content:user}],{json:true,image}));
     if(!j.prompt)throw new Error('模型没有返回新的正面提示词');
