@@ -908,7 +908,7 @@ function scanDups() {
     m.get(s).push(e);
   }
   const hm = new Map();
-  for (const e of S.entries) if (e.fileHash) { const old=hm.get(e.fileHash); if (old && entryModel(old) === entryModel(e)) pairs.push([old, e, 'hash']); else if (!old) hm.set(e.fileHash, e); }
+  for (const e of S.entries) if (e.fileHash) { const key=e.fileHash+'||MODEL:'+String(entryModel(e)||'未指定').trim().toLowerCase(),old=hm.get(key); if (old) pairs.push([old,e,'hash']); else hm.set(key,e); }
   return pairs;
 }
 function pendingTags() { const p = new Set(); for (const e of S.entries) for (const t of e.tokens || []) if (catOf(t) === 'pending') p.add(t.n); return [...p]; }
