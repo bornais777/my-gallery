@@ -2089,7 +2089,7 @@ async function addWishReferenceImages(files) {
 function wishWeightedTag(tag,weight) { const n=Math.max(.1,Math.min(3,Number(weight)||1)),t=String(tag||'').trim(); return t?(Math.abs(n-1)<.005?t:`${n.toFixed(2).replace(/0+$/,'').replace(/\.$/,'')}::${t}::`):''; }
 async function generateWish() {
   if(!aiReady())return toast('先在设置里配置支持看图的文字 API');
-  const idea=($('#wishIdea')?.value||'').trim(),refs=S.wishReferenceImages||[],baseEntry=byId(S.wishBaseEntryId),localParts=[...new Set($('[data-wpart]:checked').map(x=>x.dataset.wpart))],localDirection=$('#wishLocalDirection')?.value||'',customParts=$('#wishCustomParts')?.value||'';
+  const idea=($('#wishIdea')?.value||'').trim(),refs=S.wishReferenceImages||[],baseEntry=byId(S.wishBaseEntryId),localParts=[...new Set($$('[data-wpart]:checked').map(x=>x.dataset.wpart))],localDirection=$('#wishLocalDirection')?.value||'',customParts=$('#wishCustomParts')?.value||'';
   S.wishLocalParts=localParts;S.wishCustomPart=localDirection;S.wishCustomParts=customParts;
   if(!idea&&!refs.length&&!baseEntry)return toast('请填写风格描述、上传参考图片或选择已有画师串');
   if((refs.length||baseEntry?.thumbId)&&SET.text.provider==='deepseek')return toast('当前 DeepSeek 接口不支持图片输入，请切换到支持视觉输入的模型');
