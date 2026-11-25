@@ -2080,7 +2080,8 @@ async function addWishReferenceImages(files) {
   clearWishReferenceImages();S.wishReferenceImages=valid.map(file=>({file,url:URL.createObjectURL(file),name:file.name}));
   render();
 }
-function wishWeightedTag(tag,weight) {async function generateWish() {
+function wishWeightedTag(tag,weight) { const n=Math.max(.1,Math.min(3,Number(weight)||1)),t=String(tag||'').trim(); return t?(Math.abs(n-1)<.005?t:`${n.toFixed(2).replace(/0+$/,'').replace(/\.$/,'')}::${t}::`):''; }
+async function generateWish() {
   if(!aiReady())return toast('先在设置里配置支持看图的文字 API');
   const idea=($('#wishIdea')?.value||'').trim(),refs=S.wishReferenceImages||[];
   if(!idea&&!refs.length)return toast('请填写风格描述或上传参考图片');
