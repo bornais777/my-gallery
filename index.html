@@ -892,7 +892,7 @@ function diffEntry(e, b) {
 }
 function artistSig(e) { const a = artistsOf(e); return a.length ? a.map(x => x.n + '@' + x.w).sort().join('|') : null; }
 function negativeSig(e) { return String(e.negative || '').replace(/\s+/g, ' ').trim(); }
-function duplicateSig(e) { const a = artistSig(e); return a ? a + '||NEG:' + negativeSig(e) : null; }
+function duplicateSig(e) { const a = artistSig(e); return a ? a + '||MODEL:' + String(entryModel(e) || '未指定').trim().toLowerCase() + '||NEG:' + negativeSig(e) : null; }
 const pairKey = (a, b) => [a.id, b.id].sort().join('|');
 function findDupFor(e) {
   const s = duplicateSig(e); if (!s) return null;
@@ -908,7 +908,7 @@ function scanDups() {
     m.get(s).push(e);
   }
   const hm = new Map();
-  for (const e of S.entries) if (e.fileHash) { if (hm.has(e.fileHash)) pairs.push([hm.get(e.fileHash), e, 'hash']); else hm.set(e.fileHash, e); }
+  for (const e of S.entries) if (e.fileHash) { const old=hm.get(e.fileHash); if (old && entryModel(old) === entryModel(e)) pairs.push([old, e, 'hash']); else if (!old) hm.set(e.fileHash, e); }
   return pairs;
 }
 function pendingTags() { const p = new Set(); for (const e of S.entries) for (const t of e.tokens || []) if (catOf(t) === 'pending') p.add(t.n); return [...p]; }
@@ -2056,7 +2056,7 @@ function renderWish(main) {
   </section>
   ${w?`<section class="scard glass wish-result"><h3>候选方案</h3><p class="muted sm">画师名称只能来自收藏库，权重由 AI 按目标分配；风格词和负面词也有独立权重。</p>
   ${w.fingerprint?`<div class="wish-analysis"><b>风格指纹</b><p>${esc(w.fingerprint)}</p><b>分层特征</b><p>${esc(w.layers||'')}</p><b>定位可信度</b><p>${esc(w.confidence||'')}</p></div>`:''}
-  ${w.axisSuggestions?`<div class="wish-axis-suggest"><b>AI 建议轴条位置</b><div class="wish-axis-chips">${defs.map(([id,n])=>`<span class="chip">${n}：${Number(w.axisSuggestions[id]??50)}</span>`).join('')}</div><button class="btn sm" data-act="wish-apply-axes">应用 AI 建议位置</button></div>`:''}
+  ${w.axisSuggestions?`<div class="wish-axis-suggest"><b>AI 建议轴条位置</b><div class="wish-axis-chips">${defs.map(([id,n])=>`<span class="chip">${n}：${Number(w.axisSuggestions[id]??50)}</span>`).join('')}</div><span class="muted sm">已自动填入上方视觉控制轴，可继续手动微调。</span></div>`:''}
   ${w.artistComparisons?.length?`<div class="wish-analysis"><b>收藏画师匹配分析</b>${w.artistComparisons.map(a=>`<p><strong>${esc(a.name)}</strong>：${esc(a.match||'')}；偏差：${esc(a.gap||'')}</p>`).join('')}</div>`:''}
   <label class="field"><span>画师串（库内画师，权重可编辑）</span><textarea id="wishArtists" rows="3">${esc(w.artistString)}</textarea></label>
   <label class="field"><span>风格词（收藏参考 + AI 新词，含权重）</span><textarea id="wishStyles" rows="4">${esc(w.stylePrompt)}</textarea></label>
@@ -2077,7 +2077,10 @@ function clearWishReferenceImages(){for(const x of S.wishReferenceImages||[])URL
 async function addWishReferenceImages(files) {
   const valid=files.filter(f=>f.type.startsWith('image/')).slice(0,4);
   if(!valid.length)return toast('请选择图片文件');
-  clearWishReferenceImages();S.wishReferenceImages=valid.map(file=>({file,url:URL.createObjectURL(file),name:file.name}));
+  const current=S.wishReferenceImages||[],room=Math.max(0,4-current.length),added=valid.slice(0,room);
+  if(!added.length)return toast('最多保留 4 张参考图');
+  S.wishReferenceImages=[...current,...added.map(file=>({file,url:URL.createObjectURL(file),name:file.name}))];
+  if(added.length<valid.length)toast('最多保留 4 张参考图，已添加前 '+added.length+' 张');
   render();
 }
 function wishWeightedTag(tag,weight) { const n=Math.max(.1,Math.min(3,Number(weight)||1)),t=String(tag||'').trim(); return t?(Math.abs(n-1)<.005?t:`${n.toFixed(2).replace(/0+$/,'').replace(/\.$/,'')}::${t}::`):''; }
@@ -2111,6 +2114,7 @@ async function generateWish() {
     const negativePrompt=[presetText,negativeTags].filter(Boolean).join(', '),prompt=[artistString,stylePrompt].filter(Boolean).join(', ');
     const styleNames=styleItems.map(x=>x.tag),axisSuggestions={...axes};
     for(const k of Object.keys(axisSuggestions))if(Number.isFinite(+j.axis_suggestions?.[k]))axisSuggestions[k]=Math.max(0,Math.min(100,+j.axis_suggestions[k]));
+    S.wishAxes={...axisSuggestions};
     S.wishResult={artistString,stylePrompt,prompt,negativePresets,negativeTags,negativeTagsRaw:negItems.map(x=>x.tag),negativePrompt,axisSuggestions,fingerprint:j.fingerprint||'',layers:j.layers||'',confidence:j.confidence||'',artistComparisons:(j.artist_comparisons||[]).filter(a=>allowed.has(normTag(a.name))).map(a=>({...a,name:allowed.get(normTag(a.name))})),sources:{artists:chosen.map(a=>a.name),styles:styles.filter(x=>styleNames.some(t=>normTag(t)===normTag(x.name))).map(x=>x.name)},newStyles:(j.new_styles||[]).map(x=>typeof x==='string'?x:x.tag),reason:j.reason||''};
     wait.remove();render();
   }catch(err){wait.remove();toast('许愿台生成失败：'+esc(err.message),6000);}
@@ -2494,8 +2498,8 @@ async function checkDups(list) {
   if (!ids.size) return;
   const groups = new Map(), artistGroups = new Map();
   for (const e of S.entries) {
-    const as = artistSig(e), ds = duplicateSig(e);
-    if (as) { if (!artistGroups.has(as)) artistGroups.set(as, []); artistGroups.get(as).push(e); }
+    const as = artistSig(e), modelArtistKey = as ? as + '||MODEL:' + String(entryModel(e) || '未指定').trim().toLowerCase() : null, ds = duplicateSig(e);
+    if (modelArtistKey) { if (!artistGroups.has(modelArtistKey)) artistGroups.set(modelArtistKey, []); artistGroups.get(modelArtistKey).push(e); }
     if (ds) { if (!groups.has(ds)) groups.set(ds, []); groups.get(ds).push(e); }
   }
   const candidates = [...groups.values()].filter(g => g.length > 1 && g.some(e => ids.has(e.id)) && g.some((e,i) => g.slice(0,i).some(o => !S.meta.keepPairs.includes(pairKey(o,e)))));
