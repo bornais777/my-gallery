@@ -608,6 +608,7 @@ body[data-view=cards] .fab,body[data-view=story] .fab,body[data-view=settings] .
 .wish-analysis,.wish-axis-suggest{padding:12px;border:1px solid var(--line);border-radius:var(--r2);margin:12px 0;background:var(--glass)}
 .wish-analysis p{margin:5px 0 10px;color:var(--muted);font-size:13px;line-height:1.55}
 .wish-axis-chips{display:flex;flex-wrap:wrap;gap:6px;margin:9px 0}
+.image-preview-modal .modal{width:min(96vw,1200px)}.image-preview-stage{display:grid;place-items:center;max-height:82vh;min-height:200px;overflow:auto;background:rgba(0,0,0,.08);border-radius:14px;padding:10px}.image-preview-stage img{max-width:100%;max-height:78vh;object-fit:contain;border-radius:10px}.image-preview-head{padding:4px 2px 12px}.robust-panel{display:flex;flex-direction:column;gap:14px}.robust-source select,.robust-panel select[multiple]{min-height:120px}.robust-base-preview{padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--field)}.robust-test-head{display:flex;align-items:center;gap:12px;margin-top:8px}.robust-test{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--field);margin:8px 0}.robust-enable{display:flex;justify-content:center;padding-top:8px}.robust-test-fields{display:grid;gap:8px;min-width:0}.robust-test-fields input,.robust-test-fields textarea{width:100%;min-width:0}.robust-results{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:16px}.robust-result img{cursor:zoom-in}.ed-img,#cvImg{cursor:zoom-in}
 </style>
 </head>
 <body>
@@ -1663,7 +1664,7 @@ const io = new IntersectionObserver(ents => {
 }, { rootMargin: '500px' });
 function observeThumbs(root = document) { $$('img[data-blob]:not([src])', root).forEach(i => io.observe(i)); }
 
- .image-preview-modal .modal{width:min(96vw,1200px)}.image-preview-stage{display:grid;place-items:center;max-height:82vh;min-height:200px;overflow:auto;background:rgba(0,0,0,.08);border-radius:14px;padding:10px}.image-preview-stage img{max-width:100%;max-height:78vh;object-fit:contain;border-radius:10px}.image-preview-head{padding:4px 2px 12px}.robust-panel{display:flex;flex-direction:column;gap:14px}.robust-source select,.robust-panel select[multiple]{min-height:120px}.robust-base-preview{padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--field)}.robust-test-head{display:flex;align-items:center;gap:12px;margin-top:8px}.robust-test{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:start;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--field);margin:8px 0}.robust-enable{display:flex;justify-content:center;padding-top:8px}.robust-test-fields{display:grid;gap:8px;min-width:0}.robust-test-fields input,.robust-test-fields textarea{width:100%;min-width:0}.robust-results{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:16px}.robust-result img{cursor:zoom-in}.ed-img,#cvImg{cursor:zoom-in}
+ 
 /* ================= 主渲染 ================= */
 function applyTheme() { const t = SET.theme; if (t === 'auto') delete document.documentElement.dataset.theme; else document.documentElement.dataset.theme = t; }
 function render() {
