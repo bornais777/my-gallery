@@ -2807,7 +2807,7 @@ const ACT = {
     const selectedIds=[...($('#robustLibrary')?.selectedOptions||[])].map(x=>x.value);SET.robust.libraryEntryIds=selectedIds;const libraryBase=S.entries.filter(e=>selectedIds.includes(e.id)).map(e=>e.prompt||'').filter(Boolean);
     const manualBase=$('#robustBase')?.value.trim()||'';SET.robust.base=manualBase;const base=[...libraryBase,manualBase].filter(Boolean).join(', ');if(!base)return toast('先从画谱选择画师串，或手动填写基准串');
     SET.robust.negative=$('#robustNeg')?.value||'';
-    SET.robust.tests=$('[data-rname]').map(x=>({id:x.dataset.rname,name:x.value,prompt:$('[data-rprompt="'+x.dataset.rname+'"]')?.value||'',enabled:!!$('[data-renabled="'+x.dataset.rname+'"]')?.checked}));saveSettings();
+    SET.robust.tests=[...document.querySelectorAll('[data-rname]')].map(x=>({id:x.dataset.rname,name:x.value,prompt:$('[data-rprompt="'+x.dataset.rname+'"]')?.value||'',enabled:!!$('[data-renabled="'+x.dataset.rname+'"]')?.checked}));saveSettings();
     if(!SET.nai.key)return toast('先在设置里填写 NAI 生图 Key');
     const tests=SET.robust.tests.filter(x=>x.enabled&&x.name.trim());if(!tests.length)return toast('至少勾选一个测试项');
     S.robustResults=[]; render();
