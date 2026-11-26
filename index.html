@@ -2040,7 +2040,7 @@ function renderRobust(main) {
   const libSelected=S.entries.filter(e=>SET.robust.libraryEntryIds.includes(e.id));const basePreview=[...libSelected.map(e=>e.prompt||''),SET.robust.base||''].filter(Boolean).join(', ');
   main.innerHTML = `<div class="page-h"><div><h2>文生图鲁棒测试</h2><p class="muted">从画谱选择已有画师串，并可叠加手动输入；每项测试独立勾选，只生成选中的项目。</p></div></div>
   <section class="scard glass robust-panel">
-    <label class="field"><span>从画谱选择画师串（可多选）</span><select id="robustLibrary" multiple size="5">${S.entries.filter(e=>String(e.prompt||'').trim()).map(e=>`<option value="${e.id}" ${SET.robust.libraryEntryIds.includes(e.id)?'selected':''}>${esc((artistsOf(e).map(a=>a.n).join('、')||'无画师')+' · '+(e.note||e.prompt.slice(0,55)).slice(0,64))}</option>`).join('')}</select><small class="muted">按住 Ctrl（Mac 为 Command）可多选；库内提示词会完整带入。</small></label>
+    <label class="field"><span>从画谱选择画师串（可多选）</span><select id="robustLibrary" multiple size="5">${S.entries.filter(e=>String(e.prompt||'').trim()).map(e=>`<option value="${e.id}" ${SET.robust.libraryEntryIds.includes(e.id)?'selected':''}>${esc((artistsOf(e).map(a=>a.n).join('、')||'无画师')+' · '+(e.note||e.prompt.slice(0,55)).slice(0,64))}</option>`).join('')}</select><div class="row-inline"><small class="muted">按住 Ctrl（Mac 为 Command）可多选；也可以清空选择后只使用手动输入。</small><button class="btn sm ghost" type="button" data-act="robust-clear-library">清空选择</button></div></label>
     <label class="field"><span>手动追加的基准画师串 / 风格串（可与库内选择并存）</span><textarea id="robustBase" rows="3" placeholder="artist:..., style tags...">${esc(SET.robust.base || '')}</textarea></label>
     <div class="robust-base-preview"><b>当前基准预览</b><div id="robustBasePreview" class="ptxt mono">${esc(basePreview||'（尚未选择或输入）')}</div></div>
     <label class="field"><span>统一负面提示词</span><textarea id="robustNeg" rows="2" placeholder="可留空">${esc(SET.robust.negative || '')}</textarea></label>
@@ -2802,11 +2802,12 @@ const ACT = {
   'style-index-add': async () => { const n=await promptText('添加常用风格词','','输入原始英文标签'); if(!n)return; const k=normTag(n); S.tags[k]={c:'style',m:1}; await saveTags(); render(); toast('已加入风格词索引'); },
   'robust-add': () => { SET.robust ||= {}; SET.robust.tests ||= []; SET.robust.tests.push({id:uid(),name:'自定义测试',prompt:'',enabled:false}); saveSettings(); render(); },
   'robust-remove': el => { SET.robust.tests=(SET.robust?.tests||[]).filter(x=>x.id!==el.dataset.id); saveSettings(); render(); },
+  'robust-clear-library': () => { SET.robust ||= {}; SET.robust.libraryEntryIds=[]; saveSettings(); const sel=$('#robustLibrary'); if(sel) [...sel.options].forEach(o=>o.selected=false); const p=$('#robustBasePreview'); if(p)p.textContent=$('#robustBase')?.value.trim()||'（尚未选择或输入）'; toast('已清空画谱选择，可以直接填写新串'); },
   'robust-run': async () => {
     const selectedIds=[...($('#robustLibrary')?.selectedOptions||[])].map(x=>x.value);SET.robust.libraryEntryIds=selectedIds;const libraryBase=S.entries.filter(e=>selectedIds.includes(e.id)).map(e=>e.prompt||'').filter(Boolean);
     const manualBase=$('#robustBase')?.value.trim()||'';SET.robust.base=manualBase;const base=[...libraryBase,manualBase].filter(Boolean).join(', ');if(!base)return toast('先从画谱选择画师串，或手动填写基准串');
     SET.robust.negative=$('#robustNeg')?.value||'';
-    SET.robust.tests=[...$('[data-rname]')].map(x=>({id:x.dataset.rname,name:x.value,prompt:$('[data-rprompt="'+x.dataset.rname+'"]')?.value||'',enabled:!!$('[data-renabled="'+x.dataset.rname+'"]')?.checked}));saveSettings();
+    SET.robust.tests=$('[data-rname]').map(x=>({id:x.dataset.rname,name:x.value,prompt:$('[data-rprompt="'+x.dataset.rname+'"]')?.value||'',enabled:!!$('[data-renabled="'+x.dataset.rname+'"]')?.checked}));saveSettings();
     if(!SET.nai.key)return toast('先在设置里填写 NAI 生图 Key');
     const tests=SET.robust.tests.filter(x=>x.enabled&&x.name.trim());if(!tests.length)return toast('至少勾选一个测试项');
     S.robustResults=[]; render();
